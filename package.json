@@ -11,8 +11,15 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "date-fns": "^4.4.0",
+    "date-fns-jalali": "4.4.0-0",
+    "dexie": "^4.4.5",
+    "dexie-react-hooks": "^4.4.0",
+    "lucide-react": "^1.35.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
