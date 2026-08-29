@@ -2,6 +2,7 @@
   "name": "taraz",
   "version": "0.0.0",
   "private": true,
+  "description": "Offline-first personal finance tracker for Android that turns Iranian bank SMS into categorized transactions.",
   "type": "module",
   "scripts": {
     "dev": "vp dev",

@@ -37,6 +37,8 @@ jobs:
       # `vp check` runs format, lint and type checks in one pass.
       - run: pnpm exec vp check
 
+      - run: pnpm exec vp test run
+
       - run: pnpm exec vp build
 
       - uses: actions/upload-artifact@v7
@@ -100,7 +102,7 @@ jobs:
           prerelease: true
           files: release/taraz.apk
           body: |
-            آخرین بیلد از شاخه main — کامیت ${{ github.sha }}
+            Latest build from `main` — commit ${{ github.sha }}.
 
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
