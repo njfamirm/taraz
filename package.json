@@ -10,6 +10,7 @@
     "lint": "vp lint",
     "preview": "vp preview",
     "prepare": "vp config",
+    "assets:generate": "capacitor-assets generate --android --splashBackgroundColor '#4B6FE0' --splashBackgroundColorDark '#1e293b'",
     "cap": "cap",
     "android:sync": "vp build && cap sync android",
     "android:open": "cap open android"
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@capacitor/android": "^8.5.0",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.0",
     "@rolldown/plugin-babel": "^0.2.3",
     "@types/babel__core": "^7.20.5",
