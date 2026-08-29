@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>تراز — حسابداری شخصی آفلاین</title>
+    <meta
+      name="description"
+      content="تراز پیامک‌های بانکی را به تراکنش تبدیل می‌کند و با یک لمس از نوار اعلان اندروید دسته‌بندی‌شان می‌کنی. کاملاً آفلاین."
+    />
+    <link rel="icon" href="./favicon.svg" />
+    <style>
+      @font-face {
+        font-family: "Vazirmatn";
+        src: url("./fonts/Vazirmatn-Regular.woff2") format("woff2");
+        font-weight: 400;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Vazirmatn";
+        src: url("./fonts/Vazirmatn-Bold.woff2") format("woff2");
+        font-weight: 700;
+        font-display: swap;
+      }
+      :root {
+        --bg: #ffffff;
+        --fg: #171717;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --brand: #4b7bec;
+        --card: #f8fafc;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0a0a0a;
+          --fg: #f5f5f5;
+          --muted: #9ca3af;
+          --line: #262626;
+          --card: #141414;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Vazirmatn", system-ui, sans-serif;
+        line-height: 1.9;
+      }
+      main {
+        max-width: 44rem;
+        margin: 0 auto;
+        padding: 4rem 1.25rem 6rem;
+      }
+      h1 {
+        font-size: 2.5rem;
+        margin: 0 0 0.5rem;
+        letter-spacing: -0.01em;
+      }
+      .lede {
+        color: var(--muted);
+        font-size: 1.1rem;
+        margin: 0 0 2rem;
+      }
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--brand);
+        color: #fff;
+        text-decoration: none;
+        padding: 0.9rem 1.6rem;
+        border-radius: 0.8rem;
+        font-weight: 700;
+        font-size: 1.05rem;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-top: 0.75rem;
+      }
+      .meta code {
+        background: var(--card);
+        padding: 0.1rem 0.35rem;
+        border-radius: 0.3rem;
+      }
+      ul.features {
+        list-style: none;
+        padding: 0;
+        margin: 3rem 0 0;
+      }
+      ul.features li {
+        border-top: 1px solid var(--line);
+        padding: 1rem 0;
+      }
+      ul.features b {
+        display: block;
+      }
+      ul.features span {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      section.install {
+        margin-top: 3rem;
+        border: 1px solid var(--line);
+        border-radius: 0.9rem;
+        padding: 1rem 1.25rem;
+        background: var(--card);
+      }
+      ol {
+        padding-inline-start: 1.2rem;
+        margin: 0.5rem 0 0;
+      }
+      footer {
+        margin-top: 4rem;
+        border-top: 1px solid var(--line);
+        padding-top: 1.5rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      a {
+        color: var(--brand);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>تراز</h1>
+      <p class="lede">
+        پیامک‌های بانکی‌ات را به تراکنش تبدیل می‌کند و با <b>یک لمس از نوار اعلان</b> دسته‌بندی‌شان
+        می‌کنی — بدون باز کردن اپ. همه‌چیز روی گوشی می‌ماند: نه سروری، نه حسابی، نه اینترنتی.
+      </p>
+
+      <a class="cta" href="https://github.com/njfamirm/taraz/releases/download/nightly/taraz.apk">
+        دانلود APK
+      </a>
+      <p class="meta">
+        اندروید ۷ به بالا · نصب از طریق sideload · آخرین بیلد:
+        <code>__BUILD_INFO__</code>
+      </p>
+
+      <ul class="features">
+        <li>
+          <b>ثبت بدون اصطکاک</b>
+          <span>اعلان اکشن‌دار: شرکت، خوراک، دُنگ — یک لمس و تمام.</span>
+        </li>
+        <li>
+          <b>موتور طلب و بدهی</b>
+          <span
+            >خریدِ به‌حسابِ شرکت و دُنگِ دوستان جدا حساب می‌شود؛ هزینه‌ی واقعی‌ات را می‌بینی.</span
+          >
+        </li>
+        <li>
+          <b>قواعد قابل ویرایش</b>
+          <span
+            >هر بانک فرمت خودش را دارد. الگوهای پارس، داده‌اند نه کد — خودت می‌نویسی و تست
+            می‌کنی.</span
+          >
+        </li>
+        <li>
+          <b>خروجی آماده‌ی هوش مصنوعی</b>
+          <span>یک دکمه، یک متن فشرده برای چسباندن در چت مدل زبانی. بدون متن خام پیامک.</span>
+        </li>
+        <li>
+          <b>آفلاین و محلی</b>
+          <span
+            >فقط پیامک فرستنده‌های بانکی خوانده می‌شود و هیچ داده‌ای دستگاه را ترک نمی‌کند.</span
+          >
+        </li>
+      </ul>
+
+      <section class="install">
+        <b>نصب</b>
+        <ol>
+          <li>فایل APK را دانلود کن.</li>
+          <li>در اعلان نصب، اجازه‌ی «نصب از منابع ناشناس» را برای مرورگرت فعال کن.</li>
+          <li>پس از اولین اجرا، دسترسی پیامک و اعلان را بده.</li>
+          <li>در تنظیمات باتری، تراز را از بهینه‌سازی معاف کن تا اعلان‌ها به‌موقع بیایند.</li>
+        </ol>
+      </section>
+
+      <footer>
+        ساخته‌ی <a href="https://github.com/njfamirm">njfamirm</a> ·
+        <a href="https://github.com/njfamirm/taraz">سورس روی گیت‌هاب</a>
+      </footer>
+    </main>
+  </body>
+</html>
