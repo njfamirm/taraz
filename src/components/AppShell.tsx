@@ -1,12 +1,13 @@
 import type { ComponentType, ReactNode } from "react";
-import { BarChart3, Inbox, List } from "lucide-react";
+import { BarChart3, Inbox, List, MessageSquare } from "lucide-react";
 
-export type TabKey = "inbox" | "transactions" | "summary";
+export type TabKey = "inbox" | "transactions" | "summary" | "sms";
 
 const TABS: { key: TabKey; label: string; Icon: ComponentType<{ size?: number }> }[] = [
   { key: "inbox", label: "صندوق", Icon: Inbox },
   { key: "transactions", label: "تراکنش‌ها", Icon: List },
   { key: "summary", label: "خلاصه", Icon: BarChart3 },
+  { key: "sms", label: "پیامک", Icon: MessageSquare },
 ];
 
 export function AppShell({
@@ -29,7 +30,7 @@ export function AppShell({
 
       <main className="flex-1 overflow-y-auto">{children}</main>
 
-      <nav className="grid grid-cols-3 border-t border-neutral-200 dark:border-neutral-800">
+      <nav className="grid grid-cols-4 border-t border-neutral-200 dark:border-neutral-800">
         {TABS.map((tab) => (
           <button
             key={tab.key}
