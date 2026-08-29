@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">تراز</string>
+    <string name="title_activity_main">تراز</string>
+    <string name="package_name">dev.njfamirm.taraz</string>
+    <string name="custom_url_scheme">dev.njfamirm.taraz</string>
+</resources>
