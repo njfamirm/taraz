@@ -4,19 +4,25 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { AppShell, type TabKey } from "./components/AppShell.tsx";
 import { Inbox } from "./screens/Inbox.tsx";
 import { Transactions } from "./screens/Transactions.tsx";
+import { Claims } from "./screens/Claims.tsx";
 import { Summary } from "./screens/Summary.tsx";
+import { Settings } from "./screens/Settings.tsx";
 import { ManualEntry } from "./screens/ManualEntry.tsx";
-import { SmsImport } from "./screens/SmsImport.tsx";
-import { listPending, listTransactions } from "./db/repo.ts";
+import { TransactionDetail } from "./screens/TransactionDetail.tsx";
+import { listPending, listTransactions, seedDefaults } from "./db/repo.ts";
 import { SmsReader, smsAvailable } from "./native/sms.ts";
 import { ingestSms } from "./lib/ingest.ts";
 
 export default function App() {
   const [tab, setTab] = useState<TabKey>("inbox");
   const [entryOpen, setEntryOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const transactions = useLiveQuery(listTransactions, [], []);
   const pending = useLiveQuery(listPending, [], []);
+  const detail = transactions.find((tx) => tx.id === detailId);
+
+  useEffect(() => void seedDefaults(), []);
 
   // Live capture while the app is running. Background capture with the WebView
   // dead needs the manifest receiver and comes later.
@@ -26,24 +32,44 @@ export default function App() {
     return () => void handle.then((listener) => listener.remove());
   }, []);
 
+  // Switching tabs always leaves the detail sheet.
+  function changeTab(next: TabKey) {
+    setDetailId(null);
+    setEntryOpen(false);
+    setTab(next);
+  }
+
+  if (detail) {
+    return (
+      <AppShell active={tab} onChange={changeTab} pendingCount={pending.length}>
+        <TransactionDetail tx={detail} onClose={() => setDetailId(null)} />
+      </AppShell>
+    );
+  }
+
   return (
-    <AppShell active={tab} onChange={setTab} pendingCount={pending.length}>
+    <AppShell active={tab} onChange={changeTab} pendingCount={pending.length}>
       {entryOpen ? (
         <ManualEntry onDone={() => setEntryOpen(false)} />
       ) : (
         <div className="relative h-full">
-          {tab === "inbox" && <Inbox pending={pending} />}
-          {tab === "transactions" && <Transactions transactions={transactions} />}
+          {tab === "inbox" && <Inbox pending={pending} onOpen={setDetailId} />}
+          {tab === "transactions" && (
+            <Transactions transactions={transactions} onOpen={setDetailId} />
+          )}
+          {tab === "claims" && <Claims />}
           {tab === "summary" && <Summary transactions={transactions} />}
-          {tab === "sms" && <SmsImport />}
-          <button
-            type="button"
-            onClick={() => setEntryOpen(true)}
-            className="fixed bottom-20 left-4 grid size-14 place-items-center rounded-full bg-[var(--color-brand)] text-white shadow-lg"
-            aria-label="ثبت تراکنش"
-          >
-            <Plus size={26} />
-          </button>
+          {tab === "settings" && <Settings />}
+          {tab !== "settings" && (
+            <button
+              type="button"
+              onClick={() => setEntryOpen(true)}
+              className="fixed bottom-20 left-4 grid size-14 place-items-center rounded-full bg-[var(--color-brand)] text-white shadow-lg"
+              aria-label="ثبت تراکنش"
+            >
+              <Plus size={26} />
+            </button>
+          )}
         </div>
       )}
     </AppShell>

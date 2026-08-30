@@ -3,7 +3,13 @@ import type { Transaction } from "../db/types.ts";
 import { TransactionRow } from "../components/TransactionRow.tsx";
 import { updateTransaction } from "../db/repo.ts";
 
-export function Inbox({ pending }: { pending: Transaction[] }) {
+export function Inbox({
+  pending,
+  onOpen,
+}: {
+  pending: Transaction[];
+  onOpen: (id: string) => void;
+}) {
   if (pending.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
@@ -18,7 +24,7 @@ export function Inbox({ pending }: { pending: Transaction[] }) {
     <ul>
       {pending.map((tx) => (
         <li key={tx.id}>
-          <TransactionRow tx={tx} />
+          <TransactionRow tx={tx} onClick={(clicked) => onOpen(clicked.id)} />
           <div className="flex gap-2 px-4 pb-3">
             <button
               type="button"
@@ -33,6 +39,13 @@ export function Inbox({ pending }: { pending: Transaction[] }) {
               className="rounded-md bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800"
             >
               نادیده
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpen(tx.id)}
+              className="rounded-md bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800"
+            >
+              جزئیات
             </button>
           </div>
         </li>
