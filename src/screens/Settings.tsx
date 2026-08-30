@@ -12,6 +12,7 @@ import {
 } from "../db/repo.ts";
 import type { PersonKind, ProjectKind } from "../db/types.ts";
 import { SmsImport } from "./SmsImport.tsx";
+import { UpdateCard } from "../components/UpdateCard.tsx";
 
 const PALETTE = ["#4B6FE0", "#E0764B", "#4BB2E0", "#9B4BE0", "#E04B7A", "#4BE0A6"];
 
@@ -63,6 +64,11 @@ export function Settings() {
       <section className="p-4">
         <h3 className="mb-2 text-sm font-bold">پیامک‌ها</h3>
         <SmsImport />
+      </section>
+
+      <section className="p-4">
+        <h3 className="mb-2 text-sm font-bold">به‌روزرسانی</h3>
+        <UpdateCard />
       </section>
     </div>
   );

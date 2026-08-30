@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+// CI injects the version and the signing key through the environment; local
+// builds fall back to a plain unsigned/debug-key build.
+def ciVersionCode = System.getenv("TARAZ_VERSION_CODE")
+def ciVersionName = System.getenv("TARAZ_VERSION_NAME")
+def keystorePath = System.getenv("TARAZ_KEYSTORE_PATH")
+
 android {
     namespace = "dev.njfamirm.taraz"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +13,8 @@ android {
         applicationId "dev.njfamirm.taraz"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode ciVersionCode ? ciVersionCode.toInteger() : 1
+        versionName ciVersionName ?: "0.0.0-dev"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,11 +22,42 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // Only declared when a keystore is supplied, so `assembleDebug` still
+        // works on a fresh clone with no secrets around.
+        if (keystorePath) {
+            release {
+                storeFile file(keystorePath)
+                // The keystore is PKCS#12 (created with openssl, no JDK required).
+                storeType "PKCS12"
+                storePassword System.getenv("TARAZ_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("TARAZ_KEY_ALIAS")
+                keyPassword System.getenv("TARAZ_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (keystorePath) {
+                signingConfig signingConfigs.release
+            }
         }
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/*.kotlin_module', 'DebugProbesKt.bin', 'kotlin/**']
+        }
+    }
+
+    dependenciesInfo {
+        // Keeps the APK reproducible and a few KB smaller; only Play needs this block.
+        includeInApk = false
+        includeInBundle = false
     }
 }
 
