@@ -2,6 +2,10 @@
  * SMS parsing. The bank-specific half lives in banks.ts: adding a bank is adding
  * a profile and its real messages to the fixtures, never editing this file.
  *
+ * Every pattern is tried against every message. The sender is never consulted —
+ * it is a phone number that varies per user and per bank, and deciding which
+ * numbers may be read at all is the approved-sender list's job, not the parser's.
+ *
  * What this deliberately does not do is guess what a purchase was *for*. A bank
  * SMS says how much moved and in which direction; anything beyond that is the
  * user's to say in the app.
@@ -10,7 +14,7 @@
 import { parse as parseJalali } from "date-fns-jalali";
 import type { Direction } from "../db/types.ts";
 import { toEnglishDigits } from "./money.ts";
-import { allDirectionWords, profileFor, type BankProfile } from "./banks.ts";
+import { ALL, bankKeyOf } from "./banks.ts";
 
 export interface RawSms {
   id: string;
@@ -25,7 +29,7 @@ export interface ParsedSms {
   occurredAt: number;
   balanceAfter: number | null;
   cardLast4: string | null;
-  /** Which bank profile read this message. */
+  /** Whose wording this turned out to be. Informational — never a filter. */
   bankKey: string;
   confidence: number;
 }
@@ -64,12 +68,9 @@ function firstMatch(patterns: RegExp[], text: string): RegExpExecArray | null {
   return null;
 }
 
-function detectDirection(text: string, profile: BankProfile): Direction | null {
-  // An unknown sender gets every bank's vocabulary; a known one gets its own.
-  const words =
-    profile.key === "generic" ? allDirectionWords() : { out: profile.out, in: profile.in };
-  const out = words.out.filter((word) => text.includes(word)).map((word) => text.indexOf(word));
-  const inn = words.in.filter((word) => text.includes(word)).map((word) => text.indexOf(word));
+function detectDirection(text: string): Direction | null {
+  const out = ALL.out.filter((word) => text.includes(word)).map((word) => text.indexOf(word));
+  const inn = ALL.in.filter((word) => text.includes(word)).map((word) => text.indexOf(word));
   const firstOut = out.length > 0 ? Math.min(...out) : -1;
   const firstIn = inn.length > 0 ? Math.min(...inn) : -1;
   if (firstOut >= 0 && firstIn >= 0) return firstOut < firstIn ? "out" : "in";
@@ -93,19 +94,18 @@ function detectOccurredAt(text: string, fallback: number): { ts: number; exact: 
 /** Returns null when the body does not look like a bank transaction at all. */
 export function parseSms(sms: RawSms): ParsedSms | null {
   const text = normalizeSmsText(sms.body);
-  const profile = profileFor(sms.sender);
 
   // The balance is read first and cut out, so the amount patterns cannot latch
   // onto "موجودی: 115,272,713" when the bank states the amount without a label.
-  const balanceMatch = firstMatch(profile.balance, text);
+  const balanceMatch = firstMatch(ALL.balance, text);
   const rawBalance = balanceMatch?.[1] ? digits(balanceMatch[1]) : null;
   const withoutBalance = balanceMatch ? text.replace(balanceMatch[0], " ") : text;
 
-  const amountMatch = firstMatch(profile.amount, withoutBalance);
+  const amountMatch = firstMatch(ALL.amount, withoutBalance);
   const rawAmount = amountMatch?.[1] ? digits(amountMatch[1]) : null;
   if (rawAmount === null || rawAmount <= 0) return null;
 
-  const direction = detectDirection(text, profile);
+  const direction = detectDirection(text);
   if (direction === null) return null;
 
   const unit = multiplier(amountMatch?.[2], text);
@@ -119,7 +119,7 @@ export function parseSms(sms: RawSms): ParsedSms | null {
     occurredAt: ts,
     balanceAfter: rawBalance === null ? null : rawBalance * balanceUnit,
     cardLast4: card ? (card[1] ?? card[2] ?? card[3] ?? null) : null,
-    bankKey: profile.key,
+    bankKey: bankKeyOf(text),
     confidence: exact ? 0.9 : 0.7,
   };
 }

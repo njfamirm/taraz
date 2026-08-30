@@ -231,17 +231,21 @@ not code.
 
 **ParseRule**
 
-| Field            | Type                      | Notes                                       |
-| ---------------- | ------------------------- | ------------------------------------------- |
-| `id`, `title`    |                           |                                             |
-| `bankKey`        | string                    |                                             |
-| `senderPatterns` | string[]                  | Which sender addresses this rule applies to |
-| `pattern`        | string                    | Regex with **named capture groups**         |
-| `directionHint`  | `'in' \| 'out' \| 'auto'` | `auto` derives direction from a keyword map |
-| `enabled`        | boolean                   |                                             |
-| `priority`       | integer                   | Lower runs first; first match wins          |
+| Field           | Type                      | Notes                                       |
+| --------------- | ------------------------- | ------------------------------------------- |
+| `id`, `title`   |                           |                                             |
+| `bankKey`       | string                    |                                             |
+| `pattern`       | string                    | Regex with **named capture groups**         |
+| `directionHint` | `'in' \| 'out' \| 'auto'` | `auto` derives direction from a keyword map |
+| `enabled`       | boolean                   |                                             |
+| `priority`      | integer                   | Lower runs first; first match wins          |
 
 **Recognized capture groups:** `amount`, `balance`, `date`, `time`, `card`, `direction`.
+
+**Rules are matched on text, never on sender.** A sender is a phone number that differs per user and
+changes over time, so it identifies nothing reliably. Which numbers the app may read is a separate,
+purely permission-side decision — the approved-sender list (4.1) — and the parser never consults
+it.
 
 A bank SMS says how much moved and in which direction. **It is not a source of truth for what the
 money was for**, and the app does not pretend otherwise: no merchant sniffing, no keyword guessing,

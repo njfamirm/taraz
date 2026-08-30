@@ -3,17 +3,16 @@ import { parseSms, type RawSms } from "./sms.ts";
 
 const RECEIVED_AT = Date.UTC(2024, 7, 2, 10, 0);
 
-function sms(body: string, sender = "bank"): RawSms {
+function sms(body: string, sender = "+989123334455"): RawSms {
   return { id: "1", sender, body, receivedAt: RECEIVED_AT };
 }
 
 // ── Blu ────────────────────────────────────────────────────────────────────
 // Real messages. Blu states the amount with no label and words the direction as
-// "پرید" / "نشست"; the account balance follows on its own line.
+// "پرید" / "نشست"; the account balance follows on its own line. The sender is a
+// plain phone number, which is exactly why parsing never looks at it.
 
-function blu(body: string): RawSms {
-  return sms(body, "blu");
-}
+const blu = sms;
 
 test("blu: withdrawal", () => {
   expect(
@@ -93,11 +92,12 @@ test("falls back to receipt time when the message has no date", () => {
   });
 });
 
-test("reads a bank's wording even from a sender we do not know", () => {
-  expect(parseSms(sms("2,500,000 ریال از حساب شما پرید"))).toMatchObject({
-    amount: 2_500_000,
-    direction: "out",
-  });
+test("the sender never affects the parse", () => {
+  const body = "سیدامیرمحمد عزیز، 2,500,000 ریال از حساب شما پرید.\nموجودی: 1,000,000 ریال";
+  const fromShortCode = parseSms(sms(body, "1000"));
+  const fromNumber = parseSms(sms(body, "+989350001122"));
+  expect(fromShortCode).toEqual(fromNumber);
+  expect(fromNumber).toMatchObject({ amount: 2_500_000, direction: "out", bankKey: "blu" });
 });
 
 test("ignores messages that are not about money moving", () => {

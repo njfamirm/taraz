@@ -1,16 +1,18 @@
 /**
  * Bank profiles: the per-bank half of SMS parsing.
  *
- * Adding a bank means adding a profile here plus its real messages to the test
- * fixtures — no changes to the parser itself. Every profile inherits the generic
- * patterns, so a profile only carries what its bank words differently.
+ * A profile is only a vocabulary — how this bank words a withdrawal, a deposit,
+ * an amount. It deliberately says nothing about who sent the message: senders are
+ * phone numbers that differ per user and change over time, and which numbers the
+ * app may read is a permission question (the approved-sender list), not a parsing
+ * one. Every profile is tried against every message; the text decides.
+ *
+ * Adding a bank is a profile here plus its real messages in the parser fixtures.
  */
 
 export interface BankProfile {
   key: string;
   title: string;
-  /** Sender ids as the device reports them. Matched loosely, case-insensitively. */
-  senders: string[];
   /** Words that mean money left the account. */
   out: string[];
   /** Words that mean money arrived. */
@@ -21,14 +23,10 @@ export interface BankProfile {
   balance: RegExp[];
 }
 
-/**
- * The fallback every profile is merged with. Bank-specific patterns run first, so
- * a profile can always override without deleting anything.
- */
+/** Wording common enough that no bank has to repeat it. */
 export const GENERIC: BankProfile = {
   key: "generic",
   title: "عمومی",
-  senders: [],
   out: ["برداشت", "خرید", "پرداخت", "بدهکار", "کاهش", "کسر", "انتقال از"],
   in: ["واریز", "بستانکار", "افزایش", "دریافت", "انتقال به"],
   amount: [
@@ -43,7 +41,6 @@ export const GENERIC: BankProfile = {
 const BLU: BankProfile = {
   key: "blu",
   title: "بلو",
-  senders: ["blu", "بلو", "blubank"],
   // Blu writes in slang: money "flies off" the account or "settles into" it.
   out: ["پرید"],
   in: ["نشست"],
@@ -53,38 +50,30 @@ const BLU: BankProfile = {
 
 export const BANKS: BankProfile[] = [BLU];
 
-function looseMatch(candidate: string, sender: string): boolean {
-  const a = candidate.toLowerCase();
-  const b = sender.toLowerCase();
-  if (b.includes(a)) return true;
-  // Operators prefix short codes inconsistently (+98, 0, 9810…), so compare tails.
-  const da = a.replace(/\D/g, "");
-  const db = b.replace(/\D/g, "");
-  return da !== "" && db !== "" && (da.endsWith(db) || db.endsWith(da));
-}
-
-/** The profile for a sender, already merged with the generic fallback. */
-export function profileFor(sender: string): BankProfile {
-  const bank = BANKS.find((profile) =>
-    profile.senders.some((candidate) => looseMatch(candidate, sender)),
-  );
-  if (!bank) return GENERIC;
-  return {
-    ...bank,
-    out: [...bank.out, ...GENERIC.out],
-    in: [...bank.in, ...GENERIC.in],
-    amount: [...bank.amount, ...GENERIC.amount],
-    balance: [...bank.balance, ...GENERIC.balance],
-  };
-}
+/**
+ * Everything the parser knows, bank wording first so a bank can shadow a generic
+ * pattern. One profile for every message — the sender is not consulted.
+ */
+export const ALL: BankProfile = {
+  key: "all",
+  title: "همه",
+  out: [...BANKS.flatMap((bank) => bank.out), ...GENERIC.out],
+  in: [...BANKS.flatMap((bank) => bank.in), ...GENERIC.in],
+  amount: [...BANKS.flatMap((bank) => bank.amount), ...GENERIC.amount],
+  balance: [...BANKS.flatMap((bank) => bank.balance), ...GENERIC.balance],
+};
 
 /**
- * A bank's own wording can appear in a message from an unknown sender (forwarded,
- * a short code we have not seen). Used only to widen direction detection.
+ * Which bank's own wording this message used, for display and for spotting format
+ * drift. `generic` means it parsed on shared patterns alone — which is a fine
+ * outcome, not a failure.
  */
-export function allDirectionWords(): { out: string[]; in: string[] } {
-  return {
-    out: [...GENERIC.out, ...BANKS.flatMap((bank) => bank.out)],
-    in: [...GENERIC.in, ...BANKS.flatMap((bank) => bank.in)],
-  };
+export function bankKeyOf(text: string): string {
+  const bank = BANKS.find(
+    (profile) =>
+      profile.out.some((word) => text.includes(word)) ||
+      profile.in.some((word) => text.includes(word)) ||
+      profile.amount.some((pattern) => pattern.test(text)),
+  );
+  return bank?.key ?? "generic";
 }

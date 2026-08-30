@@ -51,9 +51,14 @@ decision.
 **What a transaction was for is never guessed from the SMS.** A bank message says how much moved
 and in which direction; that is all the parser takes from it. Categorization is the user's.
 
-**Adding a bank** is adding a profile to [`src/lib/banks.ts`](src/lib/banks.ts) — its senders and
-the words it uses for money leaving and arriving — plus its real messages to the parser fixtures.
-The parser itself does not change. Blu is supported today.
+**Adding a bank** is adding a profile to [`src/lib/banks.ts`](src/lib/banks.ts) — the words that
+bank uses for money leaving and arriving, and any pattern of its own — plus its real messages to
+the parser fixtures. The parser itself does not change. Blu is supported today.
+
+A profile says nothing about who sent the message: every pattern is tried against every message and
+the text decides. Senders are phone numbers that differ per user and change over time; **which
+numbers may be read at all is a permission question**, handled by the approved-sender list, and it
+is entirely separate from parsing.
 
 **Categorizing from the notification shade is not possible, by design.** The ledger — accounts,
 projects, tags, rules — lives in IndexedDB inside the WebView. A notification action handled
