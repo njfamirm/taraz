@@ -12,6 +12,8 @@ import { TransactionDetail } from "./screens/TransactionDetail.tsx";
 import { listPending, listTransactions, seedDefaults } from "./db/repo.ts";
 import { SmsReader, smsAvailable } from "./native/sms.ts";
 import { ingestSms } from "./lib/ingest.ts";
+import { drainCaptured } from "./lib/capture.ts";
+import { syncBankSendersToNative } from "./lib/senders.ts";
 
 export default function App() {
   const [tab, setTab] = useState<TabKey>("inbox");
@@ -24,11 +26,28 @@ export default function App() {
 
   useEffect(() => void seedDefaults(), []);
 
-  // Live capture while the app is running. Background capture with the WebView
-  // dead needs the manifest receiver and comes later.
+  // Live capture while the app is running; the manifest receiver covers the rest.
   useEffect(() => {
     if (!smsAvailable) return;
     const handle = SmsReader.addListener("smsReceived", (sms) => void ingestSms(sms));
+    return () => void handle.then((listener) => listener.remove());
+  }, []);
+
+  // Whatever the background receiver queued is ingested on startup, and a tapped
+  // capture notification opens its transaction directly (PRD 4.3). Categorization
+  // always happens here, in the app — never from the notification shade.
+  useEffect(() => {
+    if (!smsAvailable) return;
+
+    async function drain() {
+      const openId = await drainCaptured();
+      if (!openId) return;
+      setEntryOpen(false);
+      setDetailId(openId);
+    }
+
+    void syncBankSendersToNative().then(drain);
+    const handle = SmsReader.addListener("captureTapped", () => void drain());
     return () => void handle.then((listener) => listener.remove());
   }, []);
 

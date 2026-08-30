@@ -2,10 +2,10 @@
 
 **An offline-first personal finance tracker for Android, built for one user.**
 
-Taraz reads Iranian bank SMS, turns each message into a structured transaction, and lets you
-categorize it in one tap from the Android notification shade — without opening the app. It tracks
-who owes whom (company purchases you fronted, bills split with friends) and exports a compact,
-LLM-ready summary you can paste straight into a chat.
+Taraz reads Iranian bank SMS, turns each message into a structured transaction, and notifies you
+the moment one arrives so you can tap the notification and register it in a couple of taps. It
+tracks who owes whom (company purchases you fronted, bills split with friends) and exports a
+compact, LLM-ready summary you can paste straight into a chat.
 
 Everything stays on the device. No server, no account, no network dependency.
 
@@ -15,45 +15,54 @@ Everything stays on the device. No server, no account, no network dependency.
 
 ## Status
 
-| Phase                                                        | State                                                                      |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| 1 — Foundation (Dexie schema, money/Jalali utils, RTL shell) | ✅ Done                                                                    |
-| 2 — Categorization (projects, tags, splits, claims)          | ⬜ Not started                                                             |
-| 3 — Parsing (ParseRule engine, RegEx Studio)                 | 🟡 Minimal parser in place, not yet data-driven                            |
-| 4 — Native (Capacitor, SMS plugin, actionable notifications) | 🟡 SMS reading works; background receiver and notification actions pending |
-| 5 — Output (category rules, summary, AI export, backup)      | ⬜ Not started                                                             |
+| Phase                                                        | State                                                           |
+| ------------------------------------------------------------ | --------------------------------------------------------------- |
+| 1 — Foundation (Dexie schema, money/Jalali utils, RTL shell) | ✅ Done                                                         |
+| 2 — Categorization (projects, tags, splits, claims)          | ⬜ Not started                                                  |
+| 3 — Parsing (ParseRule engine, RegEx Studio)                 | 🟡 Minimal parser in place, not yet data-driven                 |
+| 4 — Native (Capacitor, SMS plugin, capture notifications)    | ✅ Inbox import, background receiver, and capture notifications |
+| 5 — Output (category rules, summary, AI export, backup)      | ⬜ Not started                                                  |
 
 See [`docs/PRD.md`](docs/PRD.md) for the full product requirements and the reasoning behind each
 decision.
 
-## How SMS capture works today
+## How SMS capture works
 
-1. The `SmsReader` Capacitor plugin requests `READ_SMS` / `RECEIVE_SMS` and can read the device
-   inbox.
+1. The `SmsReader` Capacitor plugin requests `READ_SMS` / `RECEIVE_SMS` / `POST_NOTIFICATIONS` and
+   can read the device inbox.
 2. The SMS tab groups the inbox by sender and shows only senders with at least one parseable
-   message; you pick which senders to import, so non-bank messages are never stored.
-3. Each message is normalized (Persian/Arabic digits → ASCII, character folding), then parsed for
-   amount, direction, balance, card tail, and a Jalali timestamp. The declared unit decides Rial vs
-   Toman; all storage is integer Rial.
-4. Parsed messages become `pending` transactions, deduplicated by same sender + same body within
-   60 seconds. The raw text is always retained so a better rule can re-parse it later.
-5. While the app is running, a `BroadcastReceiver` forwards incoming SMS to the WebView live.
+   message; you pick which senders to import. Importing a sender also **approves** it — from then
+   on its new messages are captured in the background. Nothing else is ever read or stored.
+3. `SmsCaptureReceiver` is declared in the manifest, so Android wakes it even with the app process
+   dead. It drops anything not from an approved sender, appends the raw message to a small native
+   queue, and posts a notification.
+4. The notification announces the transaction (amount and direction, read natively for display
+   only) and tapping it opens the app.
+5. On startup the app drains that queue: each message is normalized (Persian/Arabic digits → ASCII,
+   character folding), parsed for amount, direction, balance, card tail, and a Jalali timestamp,
+   then stored as a `pending` transaction. The declared unit decides Rial vs Toman; all storage is
+   integer Rial. Messages are deduplicated by same sender + same body within 60 seconds, and raw
+   text is always retained so a better rule can re-parse it later.
+6. If the tap came from a notification, the app opens that transaction's detail sheet directly.
+7. While the app is in the foreground the background path stands down — the in-process receiver
+   feeds the WebView live, so there is no duplicate notification.
 
-**Not yet built:** the manifest receiver that fires with the app process dead, and the actionable
-notification that categorizes a transaction without opening the app. Those are the point of the
-product — see PRD §4.3.
+**Categorizing from the notification shade is not possible, by design.** The ledger — accounts,
+projects, tags, rules — lives in IndexedDB inside the WebView. A notification action handled
+natively can neither read nor write it, and routing the tap to JavaScript starts the app anyway.
+The notification detects and hands off; registration happens in the app. See PRD §4.3.
 
 ## Tech stack
 
-| Layer        | Choice                                                                |
-| ------------ | --------------------------------------------------------------------- |
-| Toolchain    | [Vite+](https://viteplus.dev) (`vp`) — dev, build, test, lint, format |
-| UI           | React 19 + TypeScript + React Compiler                                |
-| Styling      | Tailwind CSS v4                                                       |
-| Storage      | Dexie / IndexedDB                                                     |
-| Native shell | Capacitor 8 (Android only — iOS forbids SMS access)                   |
-| Dates        | `date-fns-jalali`                                                     |
-| CI           | GitHub Actions — debug APK on every push to `main`                    |
+| Layer        | Choice                                                                            |
+| ------------ | --------------------------------------------------------------------------------- |
+| Toolchain    | [Vite+](https://viteplus.dev) (`vp`) — dev, build, test, lint, format             |
+| UI           | React 19 + TypeScript + React Compiler                                            |
+| Styling      | Tailwind CSS v4                                                                   |
+| Storage      | Dexie / IndexedDB                                                                 |
+| Native shell | Capacitor 8 (Android only — iOS forbids SMS access)                               |
+| Dates        | `date-fns-jalali`                                                                 |
+| CI           | GitHub Actions — signed release APK, see [`docs/RELEASING.md`](docs/RELEASING.md) |
 
 ## Development
 

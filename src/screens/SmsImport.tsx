@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { MessageSquare, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BellRing, Check, MessageSquare, ShieldCheck } from "lucide-react";
 import { SmsReader, smsAvailable } from "../native/sms.ts";
 import { parseSms, type RawSms } from "../lib/sms.ts";
 import { ingestMany, ingestSms } from "../lib/ingest.ts";
 import { formatToman } from "../lib/money.ts";
+import { approveBankSender, listBankSenders, revokeBankSender } from "../lib/senders.ts";
 
 interface SenderGroup {
   sender: string;
@@ -34,6 +35,28 @@ export function SmsImport() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [paste, setPaste] = useState("");
+  const [approved, setApproved] = useState<string[]>([]);
+  const [notifyGranted, setNotifyGranted] = useState(true);
+
+  useEffect(() => {
+    void listBankSenders().then(setApproved);
+    if (smsAvailable) {
+      void SmsReader.checkNotificationPermission().then((r) => setNotifyGranted(r.granted));
+    }
+  }, []);
+
+  async function enableNotifications() {
+    const result = await SmsReader.requestNotificationPermission();
+    setNotifyGranted(result.granted);
+    if (!result.granted) setStatus("بدون اجازه‌ی اعلان، تراکنش‌ها بی‌صدا ثبت می‌شوند.");
+  }
+
+  /** Approving a sender is what turns background capture on for it (PRD 4.1). */
+  async function toggleApproval(sender: string) {
+    setApproved(
+      approved.includes(sender) ? await revokeBankSender(sender) : await approveBankSender(sender),
+    );
+  }
 
   async function requestPermission() {
     const result = await SmsReader.requestPermission();
@@ -59,8 +82,10 @@ export function SmsImport() {
   async function importSender(group: SenderGroup) {
     setBusy(true);
     const totals = await ingestMany(group.messages);
+    // Importing a sender means the user trusts it, so watch it from now on too.
+    setApproved(await approveBankSender(group.sender));
     setStatus(
-      `از ${group.sender}: ${totals.created} تراکنش تازه، ${totals.duplicate} تکراری، ${totals.unparsed} ناخوانا.`,
+      `از ${group.sender}: ${totals.created} تراکنش تازه، ${totals.duplicate} تکراری، ${totals.unparsed} ناخوانا. از این پس پیامک‌های تازه‌ی این فرستنده خودکار ثبت می‌شوند.`,
     );
     setBusy(false);
   }
@@ -115,6 +140,16 @@ export function SmsImport() {
           </p>
         )}
 
+        {smsAvailable && !notifyGranted && (
+          <button
+            type="button"
+            onClick={enableNotifications}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-brand)] py-2 text-sm font-bold text-[var(--color-brand)]"
+          >
+            <BellRing size={16} /> اجازه‌ی اعلان تراکنش تازه
+          </button>
+        )}
+
         {groups?.map((group) => (
           <button
             key={group.sender}
@@ -130,6 +165,29 @@ export function SmsImport() {
           </button>
         ))}
       </section>
+
+      {approved.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-bold">فرستنده‌های تحت نظر</h3>
+          <p className="text-xs text-neutral-500">
+            پیامک تازه‌ی این فرستنده‌ها حتی وقتی اپ بسته است ثبت می‌شود و اعلان می‌گیری. با ضربه روی
+            هرکدام، دنبال‌کردنش را متوقف می‌کنی.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {approved.map((sender) => (
+              <button
+                key={sender}
+                type="button"
+                onClick={() => void toggleApproval(sender)}
+                className="flex items-center gap-1 rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold dark:bg-neutral-800"
+              >
+                <Check size={12} className="text-[var(--color-brand)]" />
+                {sender}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-2">
         <h3 className="text-sm font-bold">آزمایش با متن پیامک</h3>

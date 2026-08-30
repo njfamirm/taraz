@@ -8,8 +8,9 @@ Version 0.1 · Status: Draft · Owner: S. Amir Mohammad Najafi
 ## 1. Summary
 
 Taraz is a **single-user, offline-first personal accounting app for Android**. It ingests
-Iranian bank SMS notifications, turns them into structured transactions, and lets the user
-categorize each one in **one tap from the Android notification shade** — without opening the app.
+Iranian bank SMS notifications, turns them into structured transactions, and **notifies the user
+the moment one is captured** so it can be reviewed and categorized immediately, in a couple of taps
+from the notification.
 
 On top of raw bookkeeping it tracks **who owes whom**: expenses paid on behalf of a company or a
 friend, and bills split between several people. Everything lives on the device. There is no
@@ -20,8 +21,9 @@ be pasted into an LLM chat** for analysis, budget-leak detection, and charting.
 
 ### Design principles
 
-1. **Zero-friction capture.** The most common action (categorize a fresh transaction) must cost
-   one tap and zero app launches. Anything that requires opening the app has already failed.
+1. **Zero-friction capture.** Capture is fully automatic: the user never types a transaction that
+   arrived by SMS. The notification carries the user straight to the pending transaction, and
+   categorizing it must cost a couple of taps — never navigation and searching.
 2. **Offline and local.** No backend, no sync, no telemetry. The device is the source of truth.
 3. **Radically simple.** Personal tool for one user. No multi-tenancy, no auth, no roles, no
    permissions model, no i18n framework. Persian and RTL only.
@@ -190,21 +192,27 @@ every open share belonging to person X in one operation and records the total.
 `android.provider.Telephony.SMS_RECEIVED`. Requires `RECEIVE_SMS` and `READ_SMS`.
 
 **Why a custom plugin rather than a community one:** we need the receiver to run and post an
-actionable notification even when the WebView is not alive. Off-the-shelf inbox-reader plugins
-assume a foreground JS context. A ~200-line native plugin we control is more predictable than a
-dependency we do not.
+notification even when the WebView is not alive. Off-the-shelf inbox-reader plugins assume a
+foreground JS context. A ~200-line native plugin we control is more predictable than a dependency we
+do not.
 
 **Flow**
 
-1. SMS arrives → receiver fires (works with app closed; Android wakes the receiver).
-2. Sender address is checked against the known-bank list. Non-bank SMS is dropped immediately and
-   never stored — this is a hard privacy requirement.
-3. The message body is matched against the active parse rules (4.2).
-4. On a successful parse: persist a `pending` transaction and post an **actionable
-   notification** (4.3).
-5. On a failed parse: persist a `pending` transaction with `parseConfidence: 0` and post a plain
-   notification asking the user to open the app. The raw text is kept so a new rule can be written
-   and applied retroactively.
+1. SMS arrives → the manifest receiver fires (works with the app closed; Android wakes it).
+2. The sender is checked against the approved-sender list, a copy of which the app keeps in native
+   preferences precisely so this decision can be made with the WebView dead. Anything else is
+   dropped on the spot and never stored — a hard privacy requirement.
+3. The raw message is appended to a small native queue and a **capture notification** (4.3) is
+   posted. The receiver does no parsing and writes no ledger state; it cannot, because the ledger
+   is IndexedDB inside the WebView.
+4. When the app next starts — by the notification tap or any other way — it drains the queue,
+   runs each message through the parse rules (4.2), and persists a `pending` transaction per
+   message, deduplicated as usual.
+5. A message that fails to parse still lands as a `pending` transaction with `parseConfidence: 0`
+   and its raw text intact, so a new rule can be written and applied retroactively.
+
+While the app is in the foreground the background path stands down: the in-process receiver hands
+messages straight to the WebView, so nothing is queued and no notification is posted.
 
 **Bootstrap import.** On first run, offer a one-time read of the existing SMS inbox to backfill
 history. The user picks a date range and the accounts to import.
@@ -259,31 +267,43 @@ not code.
 **Re-parse.** Any rule change offers to re-run against historical raw text. Re-parsing never
 overwrites fields the user edited by hand — manual edits win, always.
 
-### 4.3 Actionable notifications
+### 4.3 Capture notifications
 
-The core interaction. When a transaction is captured, the notification shows:
+When a transaction is captured, the app posts a notification so the user knows immediately and can
+act while the purchase is still fresh:
 
 ```
 ┌──────────────────────────────────────┐
 │  ‑۲۵۰,۰۰۰ تومان · اسنپ               │
 │  بلو · موجودی ۴,۱۲۰,۰۰۰              │
-│  [🏢 شرکت] [🍔 خوراک] [👥 دُنگ] [🏷 …] │
+│  برای ثبت ضربه بزنید                 │
 └──────────────────────────────────────┘
 ```
 
-- Android allows at most **3 action buttons**; the third is a router.
-- **Slots 1–2 are user-configurable** in settings and should be the two highest-frequency
-  destinations. Defaults: "Company" (`full-claim` against the default client project) and "Food".
-- **Slot 3 = "More"**, which opens the app directly on that transaction's detail sheet.
-- Tapping a category button writes the transaction as `categorized` and dismisses the
-  notification **without opening the app**. This is the whole point.
-- Ignoring the notification leaves the transaction `pending`. Nothing is lost.
+- The notification's job is **detection and hand-off**, nothing more: it says a transaction arrived
+  and shows enough of it (amount, direction, counterparty, account, balance) to be recognized.
+- Tapping it opens the app, which ingests the queued message and lands **directly on that
+  transaction's detail sheet**, ready for categorization. There is no hunting through a list.
+- The notification's headline is rendered natively from the message text (amount, direction, unit)
+  purely for recognizability, and falls back to the bank's own first line. It is display only —
+  the authoritative parse always runs in JS on the raw text.
+- Ignoring the notification leaves the transaction `pending` in the inbox. Nothing is lost.
 - The notification body must render correctly in RTL with Persian digits and grouped thousands.
+
+**Why there are no categorize-from-the-shade buttons.** An earlier version of this document
+promised action buttons that would file a transaction without opening the app. That is not
+achievable in this architecture and the claim has been removed. All app state — accounts, projects,
+tags, split rules, the ledger itself — lives in IndexedDB inside the WebView. A notification action
+handled natively can see none of it and cannot write a transaction; delivering the tap to JavaScript
+means starting the app process anyway, at which point the "without opening the app" property is
+gone. Categorization therefore always happens in the app, and the design goal is to make that path
+as short as possible rather than to pretend it can be skipped.
 
 ### 4.4 Auto-categorization rules
 
 Deterministic rules evaluated at capture time, before the notification is posted. A matched rule
-pre-fills the category and the notification reflects it (the user can still override).
+pre-fills the category, and the notification says so, so a correctly auto-categorized transaction
+needs no action at all (the user can still open it and override).
 
 **CategoryRule**
 
@@ -320,7 +340,7 @@ at exactly which one and why.
 5. **Summary.** A deliberately thin month view: net in/out, real expense (claims excluded),
    spending by project and by tag, open-claims total. Numbers only — **charts are the LLM's job**.
 6. **Settings.** Accounts, projects, tags, people, parse rules (RegEx Studio), category rules,
-   notification button configuration, backup/restore.
+   notification preferences, backup/restore.
 
 **UI conventions**
 
@@ -367,7 +387,7 @@ One button produces a compact, LLM-optimized text block and copies it to the cli
 | Styling       | **Tailwind CSS v4**                         | Utility-first, tiny output, first-class RTL support                                 |
 | Storage       | **Dexie / IndexedDB**                       | No native build step; inspectable in a browser; ample for tens of thousands of rows |
 | Native shell  | **Capacitor 8**                             | Android packaging + native plugin surface                                           |
-| Notifications | **`@capacitor/local-notifications`**        | Action buttons, background scheduling                                               |
+| Notifications | **`@capacitor/local-notifications`**        | Posting capture notifications and routing the tap into the app                      |
 | SMS           | **Custom Capacitor plugin**                 | `BroadcastReceiver`, must run with the WebView dead                                 |
 | Dates         | **Jalali library** (e.g. `date-fns-jalali`) | Shamsi calendar throughout                                                          |
 | CI            | **GitHub Actions**                          | Builds a debug APK on every push, uploaded as an artifact                           |
@@ -391,8 +411,10 @@ One button produces a compact, LLM-optimized text block and copies it to the cli
 - **Raw text is immutable and always retained.** Every parsing decision must be reversible.
 - **All money is integer Rial.** No floats anywhere in the money path. Formatting to Toman happens
   only at the render boundary.
-- **The notification path must work with the app process dead.** Any design that assumes a live
-  WebView is wrong.
+- **Capture must work with the app process dead.** Receiving, parsing, persisting, and notifying
+  cannot assume a live WebView.
+- **Categorization always runs in the app.** Native code never writes ledger state; the
+  notification only routes the user to it.
 
 ---
 
@@ -412,8 +434,8 @@ Parse-rule engine, the normalization pipeline, bank templates, RegEx Studio with
 re-parse. Fed by pasting SMS text by hand — this proves the parser before any native work starts.
 
 **Phase 4 — Native**
-Capacitor Android integration, the custom SMS plugin, actionable notifications, notification-button
-configuration, first-run inbox import, and the GitHub Actions APK build.
+Capacitor Android integration, the custom SMS plugin, capture notifications and deep-linking into
+the transaction detail sheet, first-run inbox import, and the GitHub Actions APK build.
 
 **Phase 5 — Output**
 Category rules, the summary screen, the AI export in both formats, backup and restore.
@@ -425,8 +447,8 @@ which keeps the slow native loop out of the critical path for as long as possibl
 
 ## 7. Open questions
 
-1. **Notification action limit.** Three buttons is an Android hard limit. Are the two configurable
-   slots plus "More" enough in daily use, or do we need per-account button sets?
+1. **Post-tap speed.** Since categorization always happens in the app, how few taps can the
+   transaction detail sheet get to for the common cases (company claim, food, split)?
 2. **Doze mode.** Aggressive Android battery management may delay the receiver on some OEM ROMs
    (Xiaomi, Samsung). Do we need a foreground service, or is a documented battery-optimization
    exemption sufficient?
@@ -458,7 +480,7 @@ out below so the differences are not copied by accident.
   `requestPermissions()` only if not already granted, all wrapped so a denial degrades quietly
   instead of throwing.
 - **The `localNotificationActionPerformed` listener** as the single entry point for
-  "user tapped something on a notification".
+  "user tapped a notification", used here purely for routing to a transaction.
 
 ### A.2 What must be inverted
 
@@ -496,31 +518,28 @@ const config: CapacitorConfig = {
 export default config;
 ```
 
-**2. Notifications need `actionTypes`, which nexim never registered.**
+**2. Notifications carry a transaction id and route into the app.**
 
-nexim only ever posts a notification that opens a route on tap. Taraz's core interaction is
-categorizing **from the shade without opening the app**, which requires registering action types at
-startup and handling `actionId` in the listener:
+nexim posts a notification that opens a route on tap, and that shape is exactly right for Taraz —
+carry the transaction id in `extra` and navigate to its detail sheet:
 
 ```ts
-await LocalNotifications.registerActionTypes({
-  types: [
+await LocalNotifications.schedule({
+  notifications: [
     {
-      id: "TXN_CATEGORIZE",
-      actions: [
-        { id: "slot1", title: "🏢 شرکت" },
-        { id: "slot2", title: "🍔 خوراک" },
-        { id: "more", title: "🏷 بیشتر" },
-      ],
+      id: notificationId,
+      title: formatAmountLine(txn),
+      body: "برای ثبت ضربه بزنید",
+      extra: { transactionId: txn.id },
     },
   ],
 });
 ```
 
-The handler branches on `action.actionId`: `slot1`/`slot2` write the categorization and return
-without touching the UI; only `more` (and a plain body tap) navigates into the app. Note the
-**3-button Android limit** — the button set is fixed at registration time, so changing the
-configurable slots requires re-registering the action type.
+The listener reads `notification.extra.transactionId` and navigates. **No `actionTypes` and no
+action buttons.** A button that categorizes from the shade was in an earlier draft; it cannot work,
+because the ledger lives in IndexedDB inside the WebView and a native action handler can neither
+read nor write it — see 4.3.
 
 **3. Drop the aggressive background polling.**
 

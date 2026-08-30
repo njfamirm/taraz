@@ -5,7 +5,7 @@ import { parseSms, type RawSms } from "./sms.ts";
 const DEDUPE_WINDOW_MS = 60_000;
 
 /** PRD 3.1: banks re-send. Same sender + body within 60s is one transaction. */
-async function isDuplicate(sms: RawSms, occurredAt: number): Promise<boolean> {
+async function findDuplicate(sms: RawSms, occurredAt: number): Promise<string | null> {
   const near = await db.transactions
     .where("[rawSender+occurredAt]")
     .between(
@@ -13,18 +13,30 @@ async function isDuplicate(sms: RawSms, occurredAt: number): Promise<boolean> {
       [sms.sender, occurredAt + DEDUPE_WINDOW_MS],
     )
     .toArray();
-  return near.some((tx) => tx.rawText === sms.body);
+  return near.find((tx) => tx.rawText === sms.body)?.id ?? null;
 }
 
 export type IngestResult = "created" | "duplicate" | "unparsed";
 
+export interface Ingested {
+  result: IngestResult;
+  /** The transaction this SMS produced — or matched, when duplicate. */
+  transactionId: string | null;
+}
+
 /** Parse one SMS and persist it as a pending transaction. Never stores non-bank text. */
 export async function ingestSms(sms: RawSms): Promise<IngestResult> {
-  const parsed = parseSms(sms);
-  if (!parsed) return "unparsed";
-  if (await isDuplicate(sms, parsed.occurredAt)) return "duplicate";
+  return (await ingestOne(sms)).result;
+}
 
-  await createTransaction({
+/** Same as {@link ingestSms}, but reports which transaction was created. */
+export async function ingestOne(sms: RawSms): Promise<Ingested> {
+  const parsed = parseSms(sms);
+  if (!parsed) return { result: "unparsed", transactionId: null };
+  const duplicate = await findDuplicate(sms, parsed.occurredAt);
+  if (duplicate) return { result: "duplicate", transactionId: duplicate };
+
+  const transactionId = await createTransaction({
     amount: parsed.amount,
     direction: parsed.direction,
     occurredAt: parsed.occurredAt,
@@ -36,7 +48,7 @@ export async function ingestSms(sms: RawSms): Promise<IngestResult> {
     status: "pending",
     parseConfidence: parsed.confidence,
   });
-  return "created";
+  return { result: "created", transactionId };
 }
 
 export async function ingestMany(messages: RawSms[]): Promise<Record<IngestResult, number>> {

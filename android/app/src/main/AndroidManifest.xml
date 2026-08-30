@@ -20,6 +20,20 @@
             </intent-filter>
         </activity>
 
+        <!--
+            PRD 4.1: fires with the app process dead. Guarded by BROADCAST_SMS so
+            only the system can deliver to it. It queues the message and posts a
+            notification; it never writes ledger state.
+        -->
+        <receiver
+            android:name=".SmsCaptureReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
