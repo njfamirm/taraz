@@ -56,7 +56,6 @@ export async function ingestOne(sms: RawSms, options: IngestOptions = {}): Promi
     direction: parsed?.direction ?? "out",
     occurredAt,
     balanceAfter: parsed?.balanceAfter ?? null,
-    counterparty: parsed?.counterparty ?? null,
     rawText: sms.body,
     rawSender: sms.sender,
     source: "sms",

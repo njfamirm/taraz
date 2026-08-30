@@ -180,8 +180,15 @@ final class SmsCapture {
         manager.createNotificationChannel(channel);
     }
 
-    private static final Pattern AMOUNT = Pattern.compile(
+    /** Kept deliberately close to the JS parser's generic patterns (src/lib/banks.ts). */
+    private static final Pattern AMOUNT_WITH_UNIT = Pattern.compile(
+        "([\\d,\\u066C]{3,})\\s*(?:ریال|تومان|تومن)"
+    );
+    private static final Pattern AMOUNT_LABELLED = Pattern.compile(
         "(?:مبلغ|برداشت|واریز|خرید|پرداخت|انتقال|بدهکار|بستانکار)\\D{0,12}?([\\d,\\u066C]{3,})"
+    );
+    private static final Pattern BALANCE = Pattern.compile(
+        "(?:مانده|موجودی)\\D{0,12}?[\\d,\\u066C]{3,}"
     );
 
     /**
@@ -191,8 +198,15 @@ final class SmsCapture {
      */
     private static String headline(String body, String sender) {
         String text = toAsciiDigits(body);
-        Matcher match = AMOUNT.matcher(text);
-        if (!match.find()) return firstLine(body, sender);
+        // Cut the balance out first, or "موجودی: 115,272,713" wins over the amount
+        // in banks that state the amount without a label.
+        String scannable = BALANCE.matcher(text).replaceAll(" ");
+
+        Matcher match = AMOUNT_WITH_UNIT.matcher(scannable);
+        if (!match.find()) {
+            match = AMOUNT_LABELLED.matcher(scannable);
+            if (!match.find()) return firstLine(body, sender);
+        }
 
         String amount = match.group(1);
         if (amount == null) return firstLine(body, sender);
@@ -205,8 +219,12 @@ final class SmsCapture {
     }
 
     private static String direction(String text) {
-        int out = firstIndexOf(text, new String[] { "برداشت", "خرید", "پرداخت", "بدهکار", "کسر" });
-        int in = firstIndexOf(text, new String[] { "واریز", "بستانکار", "دریافت" });
+        // "پرید" / "نشست" are Blu's wording; see src/lib/banks.ts.
+        int out = firstIndexOf(
+            text,
+            new String[] { "پرید", "برداشت", "خرید", "پرداخت", "بدهکار", "کسر" }
+        );
+        int in = firstIndexOf(text, new String[] { "نشست", "واریز", "بستانکار", "دریافت" });
         if (out >= 0 && (in < 0 || out < in)) return "برداشت";
         if (in >= 0) return "واریز";
         return "تراکنش";

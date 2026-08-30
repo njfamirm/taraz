@@ -40,12 +40,20 @@ decision.
    only) and tapping it opens the app.
 5. On startup the app drains that queue: each message is normalized (Persian/Arabic digits → ASCII,
    character folding), parsed for amount, direction, balance, card tail, and a Jalali timestamp,
-   then stored as a `pending` transaction. The declared unit decides Rial vs Toman; all storage is
+   then stored as a `pending` transaction. A message the parser cannot read is still stored, with
+   its raw text and a "needs a look" flag, so nothing is lost while a bank's format is unsupported. The declared unit decides Rial vs Toman; all storage is
    integer Rial. Messages are deduplicated by same sender + same body within 60 seconds, and raw
    text is always retained so a better rule can re-parse it later.
 6. If the tap came from a notification, the app opens that transaction's detail sheet directly.
 7. While the app is in the foreground the background path stands down — the in-process receiver
    feeds the WebView live, so there is no duplicate notification.
+
+**What a transaction was for is never guessed from the SMS.** A bank message says how much moved
+and in which direction; that is all the parser takes from it. Categorization is the user's.
+
+**Adding a bank** is adding a profile to [`src/lib/banks.ts`](src/lib/banks.ts) — its senders and
+the words it uses for money leaving and arriving — plus its real messages to the parser fixtures.
+The parser itself does not change. Blu is supported today.
 
 **Categorizing from the notification shade is not possible, by design.** The ledger — accounts,
 projects, tags, rules — lives in IndexedDB inside the WebView. A notification action handled

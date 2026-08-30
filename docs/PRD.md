@@ -74,7 +74,7 @@ The central record. Created from an SMS, or entered manually.
 | `occurredAt`              | integer (epoch ms)                        | Transaction time as parsed from SMS, else receipt time            |
 | `balanceAfter`            | integer \| null                           | Account balance reported by the SMS, when present                 |
 | `accountId`               | string \| null                            | Which card/account (see 3.2)                                      |
-| `counterparty`            | string \| null                            | Merchant / person / destination as parsed                         |
+| `counterparty`            | string \| null                            | Merchant / person / destination — **entered by the user**         |
 | `rawText`                 | string \| null                            | Verbatim SMS body — never modified, used for re-parsing           |
 | `rawSender`               | string \| null                            | SMS originating address                                           |
 | `source`                  | `'sms' \| 'manual' \| 'import'`           |                                                                   |
@@ -241,8 +241,11 @@ not code.
 | `enabled`        | boolean                   |                                             |
 | `priority`       | integer                   | Lower runs first; first match wins          |
 
-**Recognized capture groups:** `amount`, `balance`, `date`, `time`, `card`, `counterparty`,
-`direction`.
+**Recognized capture groups:** `amount`, `balance`, `date`, `time`, `card`, `direction`.
+
+A bank SMS says how much moved and in which direction. **It is not a source of truth for what the
+money was for**, and the app does not pretend otherwise: no merchant sniffing, no keyword guessing,
+no purpose inferred from the text. What a transaction was for is the user's to say.
 
 **Normalization pipeline** applied to every capture, in order:
 
@@ -274,14 +277,14 @@ act while the purchase is still fresh:
 
 ```
 ┌──────────────────────────────────────┐
-│  ‑۲۵۰,۰۰۰ تومان · اسنپ               │
+│  برداشت ۲۵۰,۰۰۰ تومان                │
 │  بلو · موجودی ۴,۱۲۰,۰۰۰              │
 │  برای ثبت ضربه بزنید                 │
 └──────────────────────────────────────┘
 ```
 
 - The notification's job is **detection and hand-off**, nothing more: it says a transaction arrived
-  and shows enough of it (amount, direction, counterparty, account, balance) to be recognized.
+  and shows enough of it (amount, direction, sender) to be recognized.
 - Tapping it opens the app, which ingests the queued message and lands **directly on that
   transaction's detail sheet**, ready for categorization. There is no hunting through a list.
 - The notification's headline is rendered natively from the message text (amount, direction, unit)
@@ -315,16 +318,15 @@ needs no action at all (the user can still open it and override).
 
 **Condition kinds**
 
-- `textContains` — counterparty or raw text contains any of a keyword list
-  (e.g. `["اسنپ", "تپسی"]` → `#transport`)
 - `amountBetween` — min/max in Rial
 - `timeOfDay` — a window like 12:00–14:00 → `#lunch`
 - `dayOfWeek`
 - `account` — matches a specific card
 - `direction`
 
-Rules are pure data, listed in a settings screen with the same "preview against history" affordance
-as parse rules. There is no learning loop and no hidden state — if a rule fires, the user can point
+Conditions are about the shape of the transaction — amount, time, account, direction — never about
+what the message text seems to mean. Rules are pure data, listed in a settings screen with the same
+"preview against history" affordance as parse rules. There is no learning loop and no hidden state — if a rule fires, the user can point
 at exactly which one and why.
 
 ### 4.5 App screens
@@ -365,8 +367,8 @@ One button produces a compact, LLM-optimized text block and copies it to the cli
   with reimbursables excluded; breakdown by project; breakdown by tag; a daily series compact enough
   to chart; open claims per person; the largest N transactions; and counts of `pending` and
   `unparsed` items so the model knows how complete the data is.
-- **No raw SMS text, no card numbers, no account identifiers.** Counterparty names are kept
-  because they carry the analytical signal.
+- **No raw SMS text, no card numbers, no account identifiers.** Titles and notes the user wrote
+  are kept, because they carry the analytical signal.
 - Target size: a normal month must fit comfortably in a chat message.
 
 ### 4.7 Backup & restore
