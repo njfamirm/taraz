@@ -1,9 +1,48 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. Every screen reads from these — no raw neutral-800/text-xs
+ * decisions scattered through components. Change a token here, change the app.
+ */
 @theme {
   --font-sans: "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
-  --color-ink: oklch(0.22 0.01 260);
+
+  /* Brand and status. One accent; everything else is surface or ink. */
   --color-brand: oklch(0.62 0.16 255);
+  --color-brand-soft: oklch(0.95 0.03 255);
+  --color-positive: oklch(0.65 0.15 155);
+  --color-attention: oklch(0.72 0.15 70);
+  --color-danger: oklch(0.62 0.2 20);
+
+  /* Surfaces, ink, lines. Light values; the dark block below swaps them. */
+  --color-canvas: oklch(0.97 0.003 260);
+  --color-surface: oklch(1 0 0);
+  --color-raised: oklch(0.98 0.004 260);
+  --color-line: oklch(0.91 0.005 260);
+  --color-ink: oklch(0.22 0.01 260);
+  --color-ink-soft: oklch(0.52 0.01 260);
+  --color-ink-faint: oklch(0.68 0.01 260);
+
+  /* One rhythm for corners, so nothing looks hand-placed. */
+  --radius-card: 1rem;
+  --radius-chip: 999px;
+
+  /* Thumb-sized. Anything tappable is at least this tall. */
+  --spacing-tap: 2.75rem;
+}
+
+/* The app follows the system setting; the tokens are what flips. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: oklch(0.17 0.008 260);
+    --color-surface: oklch(0.21 0.009 260);
+    --color-raised: oklch(0.25 0.01 260);
+    --color-line: oklch(0.31 0.01 260);
+    --color-ink: oklch(0.97 0.003 260);
+    --color-ink-soft: oklch(0.72 0.01 260);
+    --color-ink-faint: oklch(0.56 0.01 260);
+    --color-brand-soft: oklch(0.32 0.06 255);
+  }
 }
 
 @font-face {
@@ -26,6 +65,67 @@ body,
 }
 
 body {
-  @apply bg-neutral-100 text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100;
+  background: var(--color-canvas);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* Fast repeated tapping must never zoom or select text. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+@layer components {
+  /* A tappable surface. Presses respond instantly — at this speed the press
+     state is the only feedback the user gets before the row is gone. */
+  .tap {
+    min-height: var(--spacing-tap);
+    transition:
+      transform 90ms ease,
+      background-color 120ms ease;
+  }
+  .tap:active {
+    transform: scale(0.97);
+  }
+
+  .card {
+    background: var(--color-surface);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-line);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: var(--spacing-tap);
+    padding-inline: 0.875rem;
+    border-radius: var(--radius-chip);
+    background: var(--color-raised);
+    border: 1px solid var(--color-line);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .chip-brand {
+    background: var(--color-brand-soft);
+    border-color: transparent;
+    color: var(--color-brand);
+  }
+
+  /* A row of chips wider than the screen scrolls instead of wrapping, so the
+     card height never jumps between items. */
+  .chip-rail {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .chip-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
 }

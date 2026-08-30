@@ -82,7 +82,9 @@ export default function App() {
           {tab === "claims" && <Claims />}
           {tab === "summary" && <Summary transactions={transactions} />}
           {tab === "settings" && <Settings />}
-          {tab !== "settings" && (
+          {/* Manual entry belongs with the ledger; the inbox has its own actions
+              and a floating button would sit on top of them. */}
+          {(tab === "transactions" || tab === "claims") && (
             <button
               type="button"
               onClick={() => setEntryOpen(true)}

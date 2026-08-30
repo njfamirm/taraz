@@ -16,24 +16,24 @@ export function TransactionRow({
     <button
       type="button"
       onClick={() => onClick?.(tx)}
-      className="flex w-full items-center justify-between border-b border-neutral-100 px-4 py-3 text-right dark:border-neutral-800"
+      className="tap flex w-full items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-right"
     >
       <div className="min-w-0">
         <div className="truncate text-sm font-bold">
           {tx.counterparty ?? (unreadable ? "پیامک خوانده نشد" : "بدون عنوان")}
         </div>
-        <div className="text-xs text-neutral-500">
+        <div className="text-xs text-[var(--color-ink-soft)]">
           {formatRelativeDay(tx.occurredAt)} · {formatJalaliTime(tx.occurredAt)}
           {tx.status === "pending" && " · در انتظار"}
         </div>
       </div>
       {unreadable ? (
-        <div className="shrink-0 text-xs font-bold text-amber-600">نیاز به بررسی</div>
+        <div className="shrink-0 text-xs font-bold text-[var(--color-attention)]">
+          نیاز به بررسی
+        </div>
       ) : (
         <div
-          className={`shrink-0 text-sm font-bold tabular-nums ${
-            isIn ? "text-emerald-600" : "text-neutral-800 dark:text-neutral-200"
-          }`}
+          className={`num shrink-0 text-sm font-bold ${isIn ? "text-[var(--color-positive)]" : ""}`}
         >
           {isIn ? "+" : "‑"}
           {formatToman(tx.amount)}
