@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Taraz — Ledger">
+  <g fill="currentColor">
+    <rect x="96" y="176" width="52" height="128" rx="26"/>
+    <rect x="176" y="112" width="52" height="192" rx="26" opacity=".45"/>
+    <rect x="256" y="208" width="52" height="96" rx="26"/>
+    <rect x="336" y="144" width="52" height="160" rx="26" opacity=".45"/>
+    <rect x="56" y="332" width="400" height="34" rx="17"/>
+    <path d="M256 388l56 84H200z"/>
+  </g>
+</svg>

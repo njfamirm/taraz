@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Taraz — Level">
+  <g fill="none" stroke="currentColor">
+    <rect x="40" y="176" width="432" height="160" rx="80" stroke-width="32"/>
+    <path d="M196 232v48M316 232v48" stroke-width="26" stroke-linecap="round"/>
+  </g>
+  <circle cx="256" cy="256" r="46" fill="currentColor"/>
+</svg>

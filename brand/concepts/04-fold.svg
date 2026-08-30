@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Taraz — Fold">
+  <g fill="currentColor">
+    <path d="M72 152h368l-72 84H144z"/>
+    <path d="M144 300h368l-72 84H72z" opacity=".45"/>
+  </g>
+</svg>

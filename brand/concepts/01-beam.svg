@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Taraz — Beam">
+  <g fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 168h304"/>
+    <path d="M256 168v56"/>
+    <path d="M104 168l-48 104a56 56 0 0 0 96 0z" stroke-width="26"/>
+    <path d="M408 168l-48 104a56 56 0 0 0 96 0z" stroke-width="26"/>
+    <path d="M256 296l72 128H184z"/>
+  </g>
+</svg>
