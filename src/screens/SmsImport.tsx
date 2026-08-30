@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { BellRing, Check, MessageSquare, ShieldCheck } from "lucide-react";
+import { BellRing, Check, MessageSquare, RefreshCw, ShieldCheck } from "lucide-react";
 import { SmsReader, smsAvailable } from "../native/sms.ts";
 import { parseSms, type RawSms } from "../lib/sms.ts";
-import { ingestMany, ingestSms } from "../lib/ingest.ts";
-import { formatToman } from "../lib/money.ts";
+import { ingestMany } from "../lib/ingest.ts";
 import { approveBankSender, listBankSenders, revokeBankSender } from "../lib/senders.ts";
 
 interface SenderGroup {
@@ -29,39 +28,54 @@ function groupBySender(messages: RawSms[]): SenderGroup[] {
     .sort((a, b) => b.parseable - a.parseable);
 }
 
+/**
+ * Two questions and nothing else: what the app is allowed to do, and which
+ * numbers it watches. Both states are read from the system on every visit —
+ * a permission already granted must never look like it still needs asking.
+ */
 export function SmsImport() {
-  const [granted, setGranted] = useState(false);
+  // null until Android answers, so neither state is claimed before it is known.
+  const [smsGranted, setSmsGranted] = useState<boolean | null>(null);
+  const [notifyGranted, setNotifyGranted] = useState<boolean | null>(null);
+  const [approved, setApproved] = useState<string[]>([]);
   const [groups, setGroups] = useState<SenderGroup[] | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [paste, setPaste] = useState("");
-  const [approved, setApproved] = useState<string[]>([]);
-  const [notifyGranted, setNotifyGranted] = useState(true);
 
+  // Read from the system, not from what we remember granting: Android is the
+  // owner of both answers and the user can change them behind our back.
   useEffect(() => {
-    void listBankSenders().then(setApproved);
-    if (smsAvailable) {
-      void SmsReader.checkNotificationPermission().then((r) => setNotifyGranted(r.granted));
+    let alive = true;
+    async function load() {
+      const senders = await listBankSenders();
+      if (!alive) return;
+      setApproved(senders);
+      if (!smsAvailable) return;
+      try {
+        const sms = await SmsReader.checkPermission();
+        const notify = await SmsReader.checkNotificationPermission();
+        if (!alive) return;
+        setSmsGranted(sms.granted);
+        setNotifyGranted(notify.granted);
+      } catch {
+        // A plugin that will not answer is not a granted permission.
+        if (!alive) return;
+        setSmsGranted(false);
+        setNotifyGranted(false);
+      }
     }
+    void load();
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  async function enableNotifications() {
-    const result = await SmsReader.requestNotificationPermission();
-    setNotifyGranted(result.granted);
-    if (!result.granted) setStatus("بدون اجازه‌ی اعلان، تراکنش‌ها بی‌صدا ثبت می‌شوند.");
+  async function askSms() {
+    setSmsGranted((await SmsReader.requestPermission()).granted);
   }
 
-  /** Approving a sender is what turns background capture on for it (PRD 4.1). */
-  async function toggleApproval(sender: string) {
-    setApproved(
-      approved.includes(sender) ? await revokeBankSender(sender) : await approveBankSender(sender),
-    );
-  }
-
-  async function requestPermission() {
-    const result = await SmsReader.requestPermission();
-    setGranted(result.granted);
-    if (!result.granted) setStatus("دسترسی پیامک داده نشد.");
+  async function askNotifications() {
+    setNotifyGranted((await SmsReader.requestNotificationPermission()).granted);
   }
 
   async function scanInbox() {
@@ -79,136 +93,151 @@ export function SmsImport() {
     }
   }
 
-  async function importSender(group: SenderGroup) {
+  async function toggle(sender: string) {
+    setApproved(
+      approved.includes(sender) ? await revokeBankSender(sender) : await approveBankSender(sender),
+    );
+  }
+
+  /** Watching a number covers what arrives next; history is a separate ask. */
+  async function importHistory(group: SenderGroup) {
     setBusy(true);
     const totals = await ingestMany(group.messages);
-    // Importing a sender means the user trusts it, so watch it from now on too.
-    setApproved(await approveBankSender(group.sender));
-    setStatus(
-      `از ${group.sender}: ${totals.created} تراکنش تازه، ${totals.duplicate} تکراری، ${totals.unparsed} ناخوانا. از این پس پیامک‌های تازه‌ی این فرستنده خودکار ثبت می‌شوند.`,
-    );
+    setStatus(`${group.sender}: ${totals.created} تراکنش تازه، ${totals.duplicate} تکراری.`);
     setBusy(false);
   }
 
-  async function importPaste() {
-    const sms: RawSms = {
-      id: `paste-${Date.now()}`,
-      sender: "paste",
-      body: paste,
-      receivedAt: Date.now(),
-    };
-    const parsed = parseSms(sms);
-    if (!parsed) {
-      setStatus("این متن به عنوان تراکنش شناخته نشد.");
-      return;
-    }
-    const result = await ingestSms(sms);
-    setStatus(
-      result === "created"
-        ? `ثبت شد: ${parsed.direction === "in" ? "واریز" : "برداشت"} ${formatToman(parsed.amount, { unit: true })}`
-        : "این پیامک قبلاً ثبت شده بود.",
+  if (!smsAvailable) {
+    return (
+      <p className="rounded-xl bg-[var(--color-raised)] p-3 text-xs leading-6 text-[var(--color-ink-soft)]">
+        خواندن پیامک فقط در نسخه‌ی اندروید کار می‌کند.
+      </p>
     );
-    setPaste("");
   }
 
+  // A number already scanned but not approved is still worth showing, so the
+  // list is the union of both.
+  const candidates = groups?.map((group) => group.sender) ?? [];
+  const senders = [...new Set([...approved, ...candidates])];
+
   return (
-    <div className="space-y-5 p-4">
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 font-bold">
-          <MessageSquare size={18} /> خواندن پیامک‌های بانکی
-        </h2>
-
-        {smsAvailable ? (
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={granted ? scanInbox : requestPermission}
-              disabled={busy}
-              className="w-full rounded-lg bg-[var(--color-brand)] py-2.5 font-bold text-white disabled:opacity-50"
-            >
-              {granted ? "جست‌وجوی صندوق پیامک" : "اجازه دسترسی به پیامک"}
-            </button>
-            <p className="flex items-start gap-1.5 text-xs text-neutral-500">
-              <ShieldCheck size={14} className="mt-0.5 shrink-0" />
-              فقط پیامک‌های فرستنده‌هایی که خودت تأیید می‌کنی ذخیره می‌شوند و هیچ‌چیز از گوشی خارج
-              نمی‌شود.
-            </p>
-          </div>
-        ) : (
-          <p className="rounded-lg bg-neutral-100 p-3 text-xs text-neutral-500 dark:bg-neutral-800">
-            خواندن خودکار پیامک فقط روی اندروید کار می‌کند. اینجا می‌توانی متن پیامک را دستی بچسبانی.
-          </p>
-        )}
-
-        {smsAvailable && !notifyGranted && (
-          <button
-            type="button"
-            onClick={enableNotifications}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-brand)] py-2 text-sm font-bold text-[var(--color-brand)]"
-          >
-            <BellRing size={16} /> اجازه‌ی اعلان تراکنش تازه
-          </button>
-        )}
-
-        {groups?.map((group) => (
-          <button
-            key={group.sender}
-            type="button"
-            onClick={() => importSender(group)}
-            disabled={busy}
-            className="flex w-full items-center justify-between rounded-lg border border-neutral-200 px-3 py-2 text-right disabled:opacity-50 dark:border-neutral-700"
-          >
-            <span className="text-sm font-bold">{group.sender}</span>
-            <span className="text-xs text-neutral-500">
-              {group.parseable} از {group.messages.length} قابل خواندن
-            </span>
-          </button>
-        ))}
+    <div className="space-y-5">
+      <section className="space-y-2">
+        <h4 className="text-xs font-bold text-[var(--color-ink-faint)]">مجوزها</h4>
+        <Permission
+          icon={<MessageSquare size={16} />}
+          label="خواندن پیامک"
+          granted={smsGranted}
+          onAsk={askSms}
+        />
+        <Permission
+          icon={<BellRing size={16} />}
+          label="اعلان تراکنش تازه"
+          granted={notifyGranted}
+          onAsk={askNotifications}
+        />
+        <p className="flex items-start gap-1.5 text-xs text-[var(--color-ink-faint)]">
+          <ShieldCheck size={14} className="mt-0.5 shrink-0" />
+          مجوزی که یک‌بار داده شده از تنظیمات اندروید پس گرفته می‌شود، نه از اینجا.
+        </p>
       </section>
-
-      {approved.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-bold">فرستنده‌های تحت نظر</h3>
-          <p className="text-xs text-neutral-500">
-            پیامک تازه‌ی این فرستنده‌ها حتی وقتی اپ بسته است ثبت می‌شود و اعلان می‌گیری. با ضربه روی
-            هرکدام، دنبال‌کردنش را متوقف می‌کنی.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {approved.map((sender) => (
-              <button
-                key={sender}
-                type="button"
-                onClick={() => void toggleApproval(sender)}
-                className="flex items-center gap-1 rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold dark:bg-neutral-800"
-              >
-                <Check size={12} className="text-[var(--color-brand)]" />
-                {sender}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
 
       <section className="space-y-2">
-        <h3 className="text-sm font-bold">آزمایش با متن پیامک</h3>
-        <textarea
-          value={paste}
-          onChange={(e) => setPaste(e.target.value)}
-          rows={4}
-          placeholder="متن پیامک بانک را اینجا بچسبان"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
-        />
-        <button
-          type="button"
-          onClick={importPaste}
-          disabled={paste.trim() === ""}
-          className="w-full rounded-lg bg-neutral-100 py-2 text-sm font-bold disabled:opacity-50 dark:bg-neutral-800"
-        >
-          خواندن و ثبت
-        </button>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-[var(--color-ink-faint)]">شماره‌های تحت نظر</h4>
+          <button
+            type="button"
+            onClick={scanInbox}
+            disabled={busy || smsGranted !== true}
+            className="chip tap !min-h-8 text-[var(--color-brand)] disabled:opacity-40"
+          >
+            <RefreshCw size={13} /> جست‌وجوی صندوق
+          </button>
+        </div>
+
+        {senders.length === 0 ? (
+          <p className="text-xs text-[var(--color-ink-soft)]">
+            صندوق را جست‌وجو کن تا شماره‌های بانک پیدا شوند.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {senders.map((sender) => {
+              const group = groups?.find((candidate) => candidate.sender === sender);
+              const watched = approved.includes(sender);
+              return (
+                <li key={sender} className="card flex items-center gap-2 p-2">
+                  <button
+                    type="button"
+                    onClick={() => void toggle(sender)}
+                    className="tap flex flex-1 items-center gap-2 text-right"
+                  >
+                    <span
+                      className={`grid size-6 shrink-0 place-items-center rounded-full ${
+                        watched
+                          ? "bg-[var(--color-brand)] text-white"
+                          : "border border-[var(--color-line)]"
+                      }`}
+                    >
+                      {watched && <Check size={14} />}
+                    </span>
+                    <span className="num text-sm font-bold" dir="ltr">
+                      {sender}
+                    </span>
+                  </button>
+                  {group && (
+                    <button
+                      type="button"
+                      onClick={() => void importHistory(group)}
+                      disabled={busy}
+                      className="chip tap !min-h-8 disabled:opacity-40"
+                    >
+                      ثبت {group.parseable} پیامک گذشته
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <p className="text-xs text-[var(--color-ink-faint)]">
+          فقط پیامک این شماره‌ها خوانده و ذخیره می‌شود — حتی وقتی اپ بسته است.
+        </p>
       </section>
 
-      {status && <p className="text-sm text-neutral-600 dark:text-neutral-300">{status}</p>}
+      {status && <p className="text-sm text-[var(--color-ink-soft)]">{status}</p>}
+    </div>
+  );
+}
+
+function Permission({
+  icon,
+  label,
+  granted,
+  onAsk,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  granted: boolean | null;
+  onAsk: () => void;
+}) {
+  return (
+    <div className="card flex items-center justify-between gap-2 p-3">
+      <span className="flex items-center gap-2 text-sm font-bold">
+        {icon}
+        {label}
+      </span>
+      {granted === null ? (
+        <span className="text-xs text-[var(--color-ink-faint)]">…</span>
+      ) : granted ? (
+        <span className="flex items-center gap-1 text-xs font-bold text-[var(--color-positive)]">
+          <Check size={14} /> داده شده
+        </span>
+      ) : (
+        <button type="button" onClick={onAsk} className="chip tap !min-h-8 chip-brand">
+          اجازه بده
+        </button>
+      )}
     </div>
   );
 }

@@ -26,7 +26,7 @@ export function Settings() {
   const people = useLiveQuery(listPeople, [], []);
 
   return (
-    <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+    <div className="divide-y divide-[var(--color-line)]">
       <Group
         title="پروژه‌ها"
         hint="جدا کردن هزینه‌ی شرکت از هزینه‌ی شخصی"
@@ -100,7 +100,7 @@ function Group({
   return (
     <section className="p-4">
       <h3 className="text-sm font-bold">{title}</h3>
-      <p className="mb-2 text-xs text-neutral-500">{hint}</p>
+      <p className="mb-2 text-xs text-[var(--color-ink-soft)]">{hint}</p>
 
       <ul className="mb-2 flex flex-wrap gap-2">
         {items.map((item) => (
@@ -123,7 +123,7 @@ function Group({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="افزودن…"
-          className="flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+          className="flex-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm"
         />
         <button
           type="submit"
