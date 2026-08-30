@@ -29,7 +29,10 @@ export default function App() {
   // Live capture while the app is running; the manifest receiver covers the rest.
   useEffect(() => {
     if (!smsAvailable) return;
-    const handle = SmsReader.addListener("smsReceived", (sms) => void ingestSms(sms));
+    const handle = SmsReader.addListener(
+      "smsReceived",
+      (sms) => void ingestSms(sms, { keepUnparsed: true }),
+    );
     return () => void handle.then((listener) => listener.remove());
   }, []);
 

@@ -18,6 +18,17 @@ async function findDuplicate(sms: RawSms, occurredAt: number): Promise<string | 
 
 export type IngestResult = "created" | "duplicate" | "unparsed";
 
+export interface IngestOptions {
+  /**
+   * Keep a message the parser could not read as a `pending` transaction with
+   * `parseConfidence: 0` instead of dropping it (PRD 4.1). Used for capture from
+   * an approved sender, where a parse failure means our rules are behind the bank,
+   * not that the message is junk. Bulk inbox import leaves this off, so scanning
+   * history does not fill the ledger with unreadable rows.
+   */
+  keepUnparsed?: boolean;
+}
+
 export interface Ingested {
   result: IngestResult;
   /** The transaction this SMS produced — or matched, when duplicate. */
@@ -25,30 +36,34 @@ export interface Ingested {
 }
 
 /** Parse one SMS and persist it as a pending transaction. Never stores non-bank text. */
-export async function ingestSms(sms: RawSms): Promise<IngestResult> {
-  return (await ingestOne(sms)).result;
+export async function ingestSms(sms: RawSms, options: IngestOptions = {}): Promise<IngestResult> {
+  return (await ingestOne(sms, options)).result;
 }
 
 /** Same as {@link ingestSms}, but reports which transaction was created. */
-export async function ingestOne(sms: RawSms): Promise<Ingested> {
+export async function ingestOne(sms: RawSms, options: IngestOptions = {}): Promise<Ingested> {
   const parsed = parseSms(sms);
-  if (!parsed) return { result: "unparsed", transactionId: null };
-  const duplicate = await findDuplicate(sms, parsed.occurredAt);
+  if (!parsed && !options.keepUnparsed) return { result: "unparsed", transactionId: null };
+
+  const occurredAt = parsed?.occurredAt ?? sms.receivedAt;
+  const duplicate = await findDuplicate(sms, occurredAt);
   if (duplicate) return { result: "duplicate", transactionId: duplicate };
 
   const transactionId = await createTransaction({
-    amount: parsed.amount,
-    direction: parsed.direction,
-    occurredAt: parsed.occurredAt,
-    balanceAfter: parsed.balanceAfter,
-    counterparty: parsed.counterparty,
+    // An unreadable message still becomes a row: amount 0, raw text intact, so it
+    // is visible in the inbox and re-parses once a rule covers it.
+    amount: parsed?.amount ?? 0,
+    direction: parsed?.direction ?? "out",
+    occurredAt,
+    balanceAfter: parsed?.balanceAfter ?? null,
+    counterparty: parsed?.counterparty ?? null,
     rawText: sms.body,
     rawSender: sms.sender,
     source: "sms",
     status: "pending",
-    parseConfidence: parsed.confidence,
+    parseConfidence: parsed?.confidence ?? 0,
   });
-  return { result: "created", transactionId };
+  return { result: parsed ? "created" : "unparsed", transactionId };
 }
 
 export async function ingestMany(messages: RawSms[]): Promise<Record<IngestResult, number>> {

@@ -14,7 +14,9 @@ export async function drainCaptured(): Promise<string | null> {
 
   // The queue is already in arrival order.
   for (const sms of messages) {
-    const { transactionId } = await ingestOne(sms);
+    // The sender is already approved, so an unreadable message is our parser
+    // falling behind the bank — keep it instead of losing it.
+    const { transactionId } = await ingestOne(sms, { keepUnparsed: true });
     if (sms.id === openCaptureId && transactionId) openTransactionId = transactionId;
   }
 
