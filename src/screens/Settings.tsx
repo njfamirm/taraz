@@ -13,6 +13,8 @@ import {
 import type { PersonKind, ProjectKind } from "../db/types.ts";
 import { SmsImport } from "./SmsImport.tsx";
 import { UpdateCard } from "../components/UpdateCard.tsx";
+import { BackupCard } from "../components/BackupCard.tsx";
+import { CategoryRules } from "./CategoryRules.tsx";
 
 const PALETTE = ["#4B6FE0", "#E0764B", "#4BB2E0", "#9B4BE0", "#E04B7A", "#4BE0A6"];
 
@@ -60,6 +62,16 @@ export function Settings() {
         }
         onRemove={(id) => db.people.delete(id)}
       />
+
+      <section className="p-4">
+        <h3 className="mb-2 text-sm font-bold">قاعده‌های دسته‌بندی</h3>
+        <CategoryRules />
+      </section>
+
+      <section className="p-4">
+        <h3 className="mb-2 text-sm font-bold">پشتیبان‌گیری</h3>
+        <BackupCard />
+      </section>
 
       <section className="p-4">
         <h3 className="mb-2 text-sm font-bold">پیامک‌ها</h3>

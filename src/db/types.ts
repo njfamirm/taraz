@@ -109,7 +109,9 @@ export interface CategoryRule {
   actions: {
     projectId?: string;
     tagIds?: string[];
+    /** A split needs a counterparty, so `splitMode` only applies with `personId`. */
     splitMode?: SplitMode;
+    personId?: string;
     note?: string;
   };
 }

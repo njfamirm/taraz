@@ -5,6 +5,7 @@ import { listProjects, listSplits, listTags } from "../db/repo.ts";
 import { formatToman } from "../lib/money.ts";
 import { formatJalaliMonth } from "../lib/date.ts";
 import { realExpense, totalOpenClaims } from "../lib/split.ts";
+import { Export } from "./Export.tsx";
 
 /** Deliberately thin: numbers only. Charts are the LLM's job (PRD 4.5). */
 export function Summary({ transactions }: { transactions: Transaction[] }) {
@@ -63,6 +64,8 @@ export function Summary({ transactions }: { transactions: Transaction[] }) {
       <p className="text-xs text-neutral-400">
         نمودارها کار مدل زبانی است — این صفحه فقط عدد می‌دهد.
       </p>
+
+      <Export transactions={transactions} />
     </div>
   );
 }

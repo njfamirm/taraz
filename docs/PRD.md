@@ -314,11 +314,11 @@ needs no action at all (the user can still open it and override).
 
 **CategoryRule**
 
-| Field                                | Type                                         | Notes          |
-| ------------------------------------ | -------------------------------------------- | -------------- |
-| `id`, `title`, `enabled`, `priority` |                                              |                |
-| `conditions`                         | `Condition[]`                                | ANDed together |
-| `actions`                            | `{ projectId?, tagIds?, splitMode?, note? }` |                |
+| Field                                | Type                                                    | Notes                                                                              |
+| ------------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `id`, `title`, `enabled`, `priority` |                                                         |                                                                                    |
+| `conditions`                         | `Condition[]`                                           | ANDed together                                                                     |
+| `actions`                            | `{ projectId?, tagIds?, splitMode?, personId?, note? }` | a split needs a counterparty, so `splitMode` only applies together with `personId` |
 
 **Condition kinds**
 
@@ -327,11 +327,15 @@ needs no action at all (the user can still open it and override).
 - `dayOfWeek`
 - `account` — matches a specific card
 - `direction`
+- `textContains` — the user's own note and counterparty only
 
 Conditions are about the shape of the transaction — amount, time, account, direction — never about
-what the message text seems to mean. Rules are pure data, listed in a settings screen with the same
-"preview against history" affordance as parse rules. There is no learning loop and no hidden state — if a rule fires, the user can point
-at exactly which one and why.
+what the message text seems to mean. `textContains` is the single text condition and it searches
+only the note and counterparty **the user wrote**, never the raw SMS.
+
+Rules are pure data, listed in a settings screen with the same "preview against history"
+affordance as parse rules. There is no learning loop and no hidden state — if a rule fires, the
+user can point at exactly which one and why.
 
 ### 4.5 App screens
 
@@ -426,25 +430,30 @@ One button produces a compact, LLM-optimized text block and copies it to the cli
 
 ## 6. Delivery plan
 
-**Phase 1 — Foundation**
+**Phase 1 — Foundation** ✅
 Vite+ app scaffold, Tailwind v4, RTL shell, Vazirmatn, Dexie schema and repositories, money and
 Jalali-date utilities, manual transaction entry, transaction list. Runs in a browser; no native
 code yet.
 
-**Phase 2 — Categorization**
+**Phase 2 — Categorization** ✅
 Projects, tags, transaction detail, the split/claim engine, the claims screen and settlement flow.
 Still browser-only, fully usable via manual entry.
 
-**Phase 3 — Parsing**
+**Phase 3 — Parsing** 🟡 (the parser is code, not yet ParseRule data; no RegEx Studio)
 Parse-rule engine, the normalization pipeline, bank templates, RegEx Studio with live preview and
 re-parse. Fed by pasting SMS text by hand — this proves the parser before any native work starts.
 
-**Phase 4 — Native**
+**Phase 4 — Native** ✅
 Capacitor Android integration, the custom SMS plugin, capture notifications and deep-linking into
 the transaction detail sheet, first-run inbox import, and the GitHub Actions APK build.
 
-**Phase 5 — Output**
+**Phase 5 — Output** ✅
 Category rules, the summary screen, the AI export in both formats, backup and restore.
+
+One part of §4.4 is outstanding: the capture notification does not announce that a rule fired,
+because the native receiver posts it before the WebView (and the rule set) is awake. Saying so
+would mean either evaluating rules natively — duplicating the engine outside IndexedDB — or
+re-posting the notification once the app drains the queue.
 
 Each phase ends with something the user can actually run. Phases 1–3 are verifiable on a laptop,
 which keeps the slow native loop out of the critical path for as long as possible.
