@@ -104,3 +104,53 @@ test("ignores messages that are not about money moving", () => {
   expect(parseSms(sms("سلام، جلسه فردا ساعت 10:30 برگزار می‌شود."))).toBeNull();
   expect(parseSms(sms("رمز پویا: 12345678"))).toBeNull();
 });
+
+// ── Keshavarzi (bki) ───────────────────────────────────────────────────────
+// Real message. No spaces after the labels, and a compact `yyMMdd-HH:mm` stamp.
+// Nothing in it names the bank, so it parses on the shared patterns — which is a
+// fine outcome, not a failure.
+
+test("keshavarzi: unspaced labels and a compact stamp", () => {
+  expect(parseSms(sms("برداشت500,000\nمانده3,009,474\n050609-12:44\nکارت1148*\nbki. ir"))).toEqual({
+    amount: 500_000,
+    direction: "out",
+    balanceAfter: 3_009_474,
+    cardLast4: "1148",
+    occurredAt: new Date(2026, 7, 31, 12, 44).getTime(), // 1405/06/09
+    bankKey: "generic",
+    confidence: 0.9,
+  });
+});
+
+// ── Post Bank ──────────────────────────────────────────────────────────────
+// Real message. The amount is signed, alone on its own line, and the card number
+// sits right where a labelled pattern would read it as the amount.
+
+test("postbank: the signed line is the amount, not the card number", () => {
+  expect(
+    parseSms(
+      sms("پست بانک\n برداشت از کارت: 1327\n-509,000\n1405/06/9\n20:15\nمانده: 9,016,510 ريال"),
+    ),
+  ).toMatchObject({
+    amount: 509_000,
+    direction: "out",
+    balanceAfter: 9_016_510,
+    cardLast4: "1327",
+    bankKey: "postbank",
+    confidence: 0.9,
+  });
+});
+
+test("postbank: a deposit reads the same way", () => {
+  expect(
+    parseSms(
+      sms("پست بانک\n واریز به کارت: 1327\n+2,500,000\n1405/06/9\n20:15\nمانده: 11,516,510 ريال"),
+    ),
+  ).toMatchObject({ amount: 2_500_000, direction: "in", balanceAfter: 11_516_510 });
+});
+
+test("a bare line of digits is not an amount", () => {
+  expect(parseSms(sms("کد پیگیری\n123456789\nبرداشت 750,000 ریال"))).toMatchObject({
+    amount: 750_000,
+  });
+});

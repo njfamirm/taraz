@@ -36,6 +36,8 @@ export interface ParsedSms {
 
 const CARD = /(?:کارت|حساب)\D{0,10}?(\d{4})\b|\*(\d{4})\b|(\d{4})\*/;
 const DATE = /(\d{4})[./-](\d{1,2})[./-](\d{1,2})/;
+/** Keshavarzi's stamp: `050609-12:44` — a two-digit Jalali year, then the clock. */
+const COMPACT_STAMP = /\b(\d{2})(\d{2})(\d{2})-(\d{1,2}):(\d{2})\b/;
 const TIME = /(\d{1,2}):(\d{2})/;
 
 /** Persian/Arabic digits → ASCII, character folding, ZWNJ removal. */
@@ -80,6 +82,14 @@ function detectDirection(text: string): Direction | null {
 }
 
 function detectOccurredAt(text: string, fallback: number): { ts: number; exact: boolean } {
+  const compact = COMPACT_STAMP.exec(text);
+  if (compact) {
+    // A two-digit year is this century's: 05 is 1405, not 0005.
+    const stamp = `14${compact[1]}/${compact[2]}/${compact[3]} ${compact[4]}:${compact[5]}`;
+    const parsed = parseJalali(stamp, "yyyy/M/d H:mm", new Date(fallback));
+    if (!Number.isNaN(parsed.getTime())) return { ts: parsed.getTime(), exact: true };
+  }
+
   const date = DATE.exec(text);
   if (!date) return { ts: fallback, exact: false };
   const day = `${date[1]}/${date[2]}/${date[3]}`;

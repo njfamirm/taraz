@@ -8,7 +8,6 @@ import { db } from "../db/db.ts";
 import type {
   Account,
   CategoryRule,
-  ParseRule,
   Person,
   Project,
   Setting,
@@ -28,7 +27,6 @@ export interface Backup {
   tags: Tag[];
   people: Person[];
   splits: Split[];
-  parseRules: ParseRule[];
   categoryRules: CategoryRule[];
   settings: Setting[];
 }
@@ -36,27 +34,17 @@ export interface Backup {
 export type RestoreMode = "replace" | "merge";
 
 export async function exportBackup(): Promise<Backup> {
-  const [
-    transactions,
-    accounts,
-    projects,
-    tags,
-    people,
-    splits,
-    parseRules,
-    categoryRules,
-    settings,
-  ] = await Promise.all([
-    db.transactions.toArray(),
-    db.accounts.toArray(),
-    db.projects.toArray(),
-    db.tags.toArray(),
-    db.people.toArray(),
-    db.splits.toArray(),
-    db.parseRules.toArray(),
-    db.categoryRules.toArray(),
-    db.settings.toArray(),
-  ]);
+  const [transactions, accounts, projects, tags, people, splits, categoryRules, settings] =
+    await Promise.all([
+      db.transactions.toArray(),
+      db.accounts.toArray(),
+      db.projects.toArray(),
+      db.tags.toArray(),
+      db.people.toArray(),
+      db.splits.toArray(),
+      db.categoryRules.toArray(),
+      db.settings.toArray(),
+    ]);
   return {
     schema: BACKUP_SCHEMA,
     exportedAt: Date.now(),
@@ -66,7 +54,6 @@ export async function exportBackup(): Promise<Backup> {
     tags,
     people,
     splits,
-    parseRules,
     categoryRules,
     settings,
   };
@@ -92,6 +79,8 @@ export function parseBackup(text: string): Backup {
   for (const key of TABLES) {
     if (!Array.isArray(backup[key])) throw new Error(`بخش «${key}» در فایل نیست`);
   }
+  // A backup written before parse rules were dropped carries a table that no
+  // longer exists; restoring must ignore it, not fail on it.
   return backup as Backup;
 }
 
@@ -102,7 +91,6 @@ const TABLES = [
   "tags",
   "people",
   "splits",
-  "parseRules",
   "categoryRules",
   "settings",
 ] as const;

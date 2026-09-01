@@ -10,7 +10,6 @@ const EMPTY = {
   tags: [],
   people: [],
   splits: [],
-  parseRules: [],
   categoryRules: [],
   settings: [],
 };

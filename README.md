@@ -19,7 +19,7 @@ Everything stays on the device. No server, no account, no network dependency.
 | ------------------------------------------------------------ | --------------------------------------------------------------- |
 | 1 — Foundation (Dexie schema, money/Jalali utils, RTL shell) | ✅ Done                                                         |
 | 2 — Categorization (projects, tags, splits, claims)          | ✅ Done                                                         |
-| 3 — Parsing (ParseRule engine, RegEx Studio)                 | 🟡 Minimal parser in place, not yet data-driven                 |
+| 3 — Parsing (normalization pipeline, bank profiles)          | ✅ Done — parsing is code, by design; see PRD §4.2              |
 | 4 — Native (Capacitor, SMS plugin, capture notifications)    | ✅ Inbox import, background receiver, and capture notifications |
 | 5 — Output (category rules, summary, AI export, backup)      | ✅ Done                                                         |
 
@@ -75,7 +75,15 @@ and in which direction; that is all the parser takes from it. Categorization is 
 
 **Adding a bank** is adding a profile to [`src/lib/banks.ts`](src/lib/banks.ts) — the words that
 bank uses for money leaving and arriving, and any pattern of its own — plus its real messages to
-the parser fixtures. The parser itself does not change. Blu is supported today.
+the parser fixtures. The parser itself does not change. Blu and Post Bank have profiles today;
+Keshavarzi and anything else conventional parses on the shared patterns alone, which is a fine
+outcome rather than a failure.
+
+**There is no regex editor in the app, and there will not be one.** A person banks with a handful
+of institutions whose formats change once in a blue moon. Writing a regex on a phone keyboard, in
+RTL, to fix a bank you use once a month is worse than adding four lines and a real message as a
+test fixture, reviewed and shipped in the next build — and it cannot break the user's only copy of
+their ledger with a typo.
 
 A profile says nothing about who sent the message: every pattern is tried against every message and
 the text decides. Senders are phone numbers that differ per user and change over time; **which

@@ -84,7 +84,7 @@ The central record. Created from an SMS, or entered manually.
 | `note`                    | string \| null                            | Free text                                                         |
 | `splitId`                 | string \| null                            | Link to a Split record (3.5)                                      |
 | `parseConfidence`         | number                                    | 0–1, from the rule that matched                                   |
-| `matchedRuleId`           | string \| null                            | Which parse rule produced this record                             |
+| `matchedRuleId`           | string \| null                            | Which category rule filed it, when one did (4.4)                  |
 | `createdAt` / `updatedAt` | integer                                   |                                                                   |
 
 **Invariants**
@@ -206,10 +206,10 @@ do not.
    posted. The receiver does no parsing and writes no ledger state; it cannot, because the ledger
    is IndexedDB inside the WebView.
 4. When the app next starts — by the notification tap or any other way — it drains the queue,
-   runs each message through the parse rules (4.2), and persists a `pending` transaction per
+   runs each message through the parser (4.2), and persists a `pending` transaction per
    message, deduplicated as usual.
 5. A message that fails to parse still lands as a `pending` transaction with `parseConfidence: 0`
-   and its raw text intact, so a new rule can be written and applied retroactively.
+   and its raw text intact, so a later build that supports the bank can read it retroactively.
 
 While the app is in the foreground the background path stands down: the in-process receiver hands
 messages straight to the WebView, so nothing is queued and no notification is posted.
@@ -224,28 +224,25 @@ history. The user picks a date range and the accounts to import.
 - The AI export (4.6) is a manual, user-initiated clipboard copy and contains **aggregates and
   transaction summaries — never raw SMS text**.
 
-### 4.2 Parse rules & RegEx Studio
+### 4.2 Parsing
 
-Every bank formats its SMS differently, and formats change. Parsing must be user-editable data,
-not code.
+Parsing is **code, not user-editable data**, and there is no regex editor in the app. The original
+plan had one; the reality of the problem does not justify it. A person banks with a handful of
+institutions, each with a couple of message formats that change once in a blue moon. Writing a
+regex on a phone keyboard, in RTL, to fix a bank you use once a month is worse than the
+alternative: a bank profile is a few lines in [`src/lib/banks.ts`](../src/lib/banks.ts), landed
+with the real message as a test fixture, and shipped in the next build. That path is reviewed,
+tested, and cannot be broken by a typo in a text field on the user's only copy of their ledger.
 
-**ParseRule**
+**A bank profile** is a vocabulary, not a parser: the words that bank uses for money leaving and
+arriving, plus any amount or balance pattern of its own. Generic patterns cover what every bank
+words the same way, so most banks need only their own two or three verbs. The parser itself does
+not change when a bank is added.
 
-| Field           | Type                      | Notes                                       |
-| --------------- | ------------------------- | ------------------------------------------- |
-| `id`, `title`   |                           |                                             |
-| `bankKey`       | string                    |                                             |
-| `pattern`       | string                    | Regex with **named capture groups**         |
-| `directionHint` | `'in' \| 'out' \| 'auto'` | `auto` derives direction from a keyword map |
-| `enabled`       | boolean                   |                                             |
-| `priority`      | integer                   | Lower runs first; first match wins          |
-
-**Recognized capture groups:** `amount`, `balance`, `date`, `time`, `card`, `direction`.
-
-**Rules are matched on text, never on sender.** A sender is a phone number that differs per user and
-changes over time, so it identifies nothing reliably. Which numbers the app may read is a separate,
-purely permission-side decision — the approved-sender list (4.1) — and the parser never consults
-it.
+**Profiles are matched on text, never on sender.** A sender is a phone number that differs per user
+and changes over time, so it identifies nothing reliably. Every profile is tried against every
+message and the text decides. Which numbers the app may read at all is a separate, purely
+permission-side decision — the approved-sender list (4.1) — and the parser never consults it.
 
 A bank SMS says how much moved and in which direction. **It is not a source of truth for what the
 money was for**, and the app does not pretend otherwise: no merchant sniffing, no keyword guessing,
@@ -257,22 +254,16 @@ no purpose inferred from the text. What a transaction was for is the user's to s
 2. Strip thousands separators (`,` `٬` and spaces)
 3. Arabic/Persian character folding (`ي`→`ی`, `ك`→`ک`, ZWNJ handling)
 4. Amount unit resolution — **the single most dangerous step.** Iranian SMS quote both Rial and
-   Toman. Each rule declares its unit explicitly (`rial` | `toman`); there is no guessing. All
-   storage is Rial.
-5. Jalali date → epoch ms
+   Toman. The unit is taken from the message's own words; where it is unstated the amount is read
+   as Rial, never guessed from its size. All storage is Rial.
+5. Jalali date → epoch ms; a message without a readable date falls back to when it arrived, and
+   says so through a lower confidence.
 
-**RegEx Studio** — a settings screen where the user can:
+**The balance is read and cut out before the amount is matched**, so an unlabelled amount cannot
+latch onto "موجودی: ۱۱۵,۲۷۲,۷۱۳".
 
-- Pick a starter template per bank (Blu, Melli, Saman, Pasargad, Mellat, Tejarat, …)
-- Write and edit a regex with live capture-group highlighting
-- Paste a real SMS and see the parsed result **immediately**, field by field, with the normalized
-  values shown next to the raw captures
-- Run a rule against all stored `rawText` and preview how many transactions it would newly match
-  or re-match before applying
-- Reorder priority and enable/disable rules
-
-**Re-parse.** Any rule change offers to re-run against historical raw text. Re-parsing never
-overwrites fields the user edited by hand — manual edits win, always.
+**Raw text is always retained**, so a message the parser could not read stays visible with
+`parseConfidence: 0` and can be re-read once a build supports its bank.
 
 ### 4.3 Capture notifications
 
@@ -333,8 +324,8 @@ Conditions are about the shape of the transaction — amount, time, account, dir
 what the message text seems to mean. `textContains` is the single text condition and it searches
 only the note and counterparty **the user wrote**, never the raw SMS.
 
-Rules are pure data, listed in a settings screen with the same "preview against history"
-affordance as parse rules. There is no learning loop and no hidden state — if a rule fires, the
+Rules are pure data, listed in a settings screen that previews a rule against real
+history before it is saved. There is no learning loop and no hidden state — if a rule fires, the
 user can point at exactly which one and why.
 
 ### 4.5 App screens
@@ -344,13 +335,12 @@ user can point at exactly which one and why.
 2. **Transactions.** Full ledger with filters (date range, account, project, tag, direction,
    settled/unsettled) and search over counterparty and note.
 3. **Transaction detail.** Amount, parsed fields, raw SMS, category editing, split editor,
-   note. Shows which parse rule matched, with a shortcut into RegEx Studio.
+   note. Shows which bank's wording it parsed as, and how confident the parse was.
 4. **Claims.** Grouped by person: open balance per person, the transactions behind it, and
    settle actions (per share or "settle all").
 5. **Summary.** A deliberately thin month view: net in/out, real expense (claims excluded),
    spending by project and by tag, open-claims total. Numbers only — **charts are the LLM's job**.
-6. **Settings.** Accounts, projects, tags, people, parse rules (RegEx Studio), category rules,
-   notification preferences, backup/restore.
+6. **Settings.** Accounts, projects, tags, people, category rules, SMS senders, backup/restore.
 
 **UI conventions**
 
@@ -439,9 +429,10 @@ code yet.
 Projects, tags, transaction detail, the split/claim engine, the claims screen and settlement flow.
 Still browser-only, fully usable via manual entry.
 
-**Phase 3 — Parsing** 🟡 (the parser is code, not yet ParseRule data; no RegEx Studio)
-Parse-rule engine, the normalization pipeline, bank templates, RegEx Studio with live preview and
-re-parse. Fed by pasting SMS text by hand — this proves the parser before any native work starts.
+**Phase 3 — Parsing** ✅
+The normalization pipeline and bank profiles, proven by real messages as test fixtures. The
+originally planned RegEx Studio was dropped: see 4.2 for why user-editable parse rules are the
+wrong shape for a problem with a handful of banks.
 
 **Phase 4 — Native** ✅
 Capacitor Android integration, the custom SMS plugin, capture notifications and deep-linking into

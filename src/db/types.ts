@@ -19,6 +19,7 @@ export interface Transaction {
   note: string | null;
   splitId: string | null;
   parseConfidence: number;
+  /** The category rule that filed it, when one did (4.4). */
   matchedRuleId: string | null;
   createdAt: number;
   updatedAt: number;
@@ -74,18 +75,6 @@ export interface Split {
   transactionId: string;
   mode: SplitMode;
   shares: Share[];
-}
-
-export interface ParseRule {
-  id: string;
-  title: string;
-  bankKey: string;
-  senderPatterns: string[];
-  pattern: string;
-  unit: "rial" | "toman";
-  directionHint: Direction | "auto";
-  enabled: boolean;
-  priority: number;
 }
 
 export interface Condition {

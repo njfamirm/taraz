@@ -48,7 +48,23 @@ const BLU: BankProfile = {
   balance: [],
 };
 
-export const BANKS: BankProfile[] = [BLU];
+/**
+ * Post Bank states the amount on its own line, signed, with no label — and puts
+ * the card number right after the word "برداشت", where a generic pattern would
+ * happily read 1327 as five hundred thousand Rial. Its own pattern runs first.
+ */
+const POST: BankProfile = {
+  key: "postbank",
+  title: "پست بانک",
+  out: [],
+  in: [],
+  // "-509,000" alone on a line. The sign is the amount's, not the direction's:
+  // direction still comes from the wording, as everywhere else.
+  amount: [/(?:^|\n)\s*[-+\u2212]([\d,\u066c]{3,})\s*(?:\n|$)/],
+  balance: [],
+};
+
+export const BANKS: BankProfile[] = [BLU, POST];
 
 /**
  * Everything the parser knows, bank wording first so a bank can shadow a generic

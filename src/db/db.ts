@@ -2,7 +2,6 @@ import Dexie, { type EntityTable } from "dexie";
 import type {
   Account,
   CategoryRule,
-  ParseRule,
   Person,
   Project,
   Setting,
@@ -18,7 +17,6 @@ export class TarazDB extends Dexie {
   tags!: EntityTable<Tag, "id">;
   people!: EntityTable<Person, "id">;
   splits!: EntityTable<Split, "id">;
-  parseRules!: EntityTable<ParseRule, "id">;
   categoryRules!: EntityTable<CategoryRule, "id">;
   settings!: EntityTable<Setting, "key">;
 
@@ -32,10 +30,12 @@ export class TarazDB extends Dexie {
       tags: "id, title, archived",
       people: "id, kind",
       splits: "id, transactionId",
-      parseRules: "id, bankKey, priority, enabled",
       categoryRules: "id, priority, enabled",
       settings: "key",
     });
+    // Parsing is code, not user-editable rules (PRD 4.2), so the table it would
+    // have lived in is gone. Dexie needs the drop declared to remove it.
+    this.version(2).stores({ parseRules: null });
   }
 }
 
