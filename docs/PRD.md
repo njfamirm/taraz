@@ -29,8 +29,8 @@ be pasted into an LLM chat** for analysis, budget-leak detection, and charting.
    permissions model, no i18n framework. Persian and RTL only.
 4. **The LLM is the analytics engine.** We do not build charts, forecasting, or ML. We build a
    very good exporter and let a language model do the reasoning.
-5. **Rules over intelligence.** Auto-categorization is deterministic user-authored rules, not a
-   model. The user can read, test, and edit every rule.
+5. **The user categorizes, not the app.** No rule engine and no model decides what a payment was
+   for. An SMS becomes a `pending` row; filing it is a deliberate human act.
 
 ### Explicit non-goals
 
@@ -83,8 +83,7 @@ The central record. Created from an SMS, or entered manually.
 | `tagIds`                  | string[]                                  | See 3.4                                                           |
 | `note`                    | string \| null                            | Free text                                                         |
 | `splitId`                 | string \| null                            | Link to a Split record (3.5)                                      |
-| `parseConfidence`         | number                                    | 0–1, from the rule that matched                                   |
-| `matchedRuleId`           | string \| null                            | Which category rule filed it, when one did (4.4)                  |
+| `parseConfidence`         | number                                    | 0–1, from the bank profile that matched                           |
 | `createdAt` / `updatedAt` | integer                                   |                                                                   |
 
 **Invariants**
@@ -291,42 +290,22 @@ act while the purchase is still fresh:
 **Why there are no categorize-from-the-shade buttons.** An earlier version of this document
 promised action buttons that would file a transaction without opening the app. That is not
 achievable in this architecture and the claim has been removed. All app state — accounts, projects,
-tags, split rules, the ledger itself — lives in IndexedDB inside the WebView. A notification action
+tags, splits, the ledger itself — lives in IndexedDB inside the WebView. A notification action
 handled natively can see none of it and cannot write a transaction; delivering the tap to JavaScript
 means starting the app process anyway, at which point the "without opening the app" property is
 gone. Categorization therefore always happens in the app, and the design goal is to make that path
 as short as possible rather than to pretend it can be skipped.
 
-### 4.4 Auto-categorization rules
+### 4.4 Categorization
 
-Deterministic rules evaluated at capture time, before the notification is posted. A matched rule
-pre-fills the category, and the notification says so, so a correctly auto-categorized transaction
-needs no action at all (the user can still open it and override).
+Manual, always. A captured SMS lands in the inbox as `pending`; the user assigns project, tags,
+note and split by hand from the detail sheet.
 
-**CategoryRule**
-
-| Field                                | Type                                                    | Notes                                                                              |
-| ------------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `id`, `title`, `enabled`, `priority` |                                                         |                                                                                    |
-| `conditions`                         | `Condition[]`                                           | ANDed together                                                                     |
-| `actions`                            | `{ projectId?, tagIds?, splitMode?, personId?, note? }` | a split needs a counterparty, so `splitMode` only applies together with `personId` |
-
-**Condition kinds**
-
-- `amountBetween` — min/max in Rial
-- `timeOfDay` — a window like 12:00–14:00 → `#lunch`
-- `dayOfWeek`
-- `account` — matches a specific card
-- `direction`
-- `textContains` — the user's own note and counterparty only
-
-Conditions are about the shape of the transaction — amount, time, account, direction — never about
-what the message text seems to mean. `textContains` is the single text condition and it searches
-only the note and counterparty **the user wrote**, never the raw SMS.
-
-Rules are pure data, listed in a settings screen that previews a rule against real
-history before it is saved. There is no learning loop and no hidden state — if a rule fires, the
-user can point at exactly which one and why.
+There is no auto-categorization: no rule engine, no keyword matching, no learning loop. Rules were
+built and then removed — for one user with a short inbox, writing and maintaining a rule set is
+more work than filing the transactions, and a rule that silently mis-files something is worse than
+an empty field. The inbox queue is the whole design: make filing one transaction fast, and the
+need to automate it goes away.
 
 ### 4.5 App screens
 
@@ -340,7 +319,7 @@ user can point at exactly which one and why.
    settle actions (per share or "settle all").
 5. **Summary.** A deliberately thin month view: net in/out, real expense (claims excluded),
    spending by project and by tag, open-claims total. Numbers only — **charts are the LLM's job**.
-6. **Settings.** Accounts, projects, tags, people, category rules, SMS senders, backup/restore.
+6. **Settings.** Accounts, projects, tags, people, SMS senders, backup/restore.
 
 **UI conventions**
 
@@ -371,7 +350,7 @@ One button produces a compact, LLM-optimized text block and copies it to the cli
 
 ### 4.7 Backup & restore
 
-- Export the full database as a single JSON file, including rules and settings.
+- Export the full database as a single JSON file, settings included.
 - Import with a mode choice: replace everything, or merge by `id`.
 - Manual only. Local file. No cloud.
 - Because the device is the only copy, the app should nudge for a backup when a month closes.
@@ -439,12 +418,10 @@ Capacitor Android integration, the custom SMS plugin, capture notifications and 
 the transaction detail sheet, first-run inbox import, and the GitHub Actions APK build.
 
 **Phase 5 — Output** ✅
-Category rules, the summary screen, the AI export in both formats, backup and restore.
+The summary screen, the AI export in both formats, backup and restore.
 
-One part of §4.4 is outstanding: the capture notification does not announce that a rule fired,
-because the native receiver posts it before the WebView (and the rule set) is awake. Saying so
-would mean either evaluating rules natively — duplicating the engine outside IndexedDB — or
-re-posting the notification once the app drains the queue.
+Category rules shipped in this phase and were then removed: see 4.4 for why categorization stayed
+manual.
 
 Each phase ends with something the user can actually run. Phases 1–3 are verifiable on a laptop,
 which keeps the slow native loop out of the critical path for as long as possible.

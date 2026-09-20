@@ -22,7 +22,6 @@ function tx(patch: Partial<Transaction> & Pick<Transaction, "id" | "amount">): T
     note: null,
     splitId: null,
     parseConfidence: 0.9,
-    matchedRuleId: null,
     createdAt: FROM,
     updatedAt: FROM,
     ...patch,

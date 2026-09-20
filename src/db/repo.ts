@@ -2,7 +2,6 @@ import { db } from "./db.ts";
 import { newId } from "../lib/id.ts";
 import type {
   Account,
-  CategoryRule,
   Person,
   Project,
   Share,
@@ -34,7 +33,6 @@ export async function createTransaction(input: NewTransaction): Promise<string> 
     note: input.note ?? null,
     splitId: input.splitId ?? null,
     parseConfidence: input.parseConfidence ?? 1,
-    matchedRuleId: input.matchedRuleId ?? null,
     createdAt: now,
     updatedAt: now,
   };
@@ -198,22 +196,6 @@ export async function seedDefaults(): Promise<void> {
       );
     }
   });
-}
-
-export function listCategoryRules(): Promise<CategoryRule[]> {
-  return db.categoryRules.toArray();
-}
-
-export async function saveCategoryRule(
-  input: Omit<CategoryRule, "id"> & { id?: string },
-): Promise<string> {
-  const rule: CategoryRule = { ...input, id: input.id ?? newId() };
-  await db.categoryRules.put(rule);
-  return rule.id;
-}
-
-export async function deleteCategoryRule(id: string): Promise<void> {
-  await db.categoryRules.delete(id);
 }
 
 export function getSetting<T>(key: string): Promise<T | undefined> {

@@ -1,20 +1,11 @@
 /**
- * Backup and restore (PRD 4.7). One JSON file with the whole database — rules
- * and settings included — because the device is the only copy. Manual, local,
- * no cloud.
+ * Backup and restore (PRD 4.7). One JSON file with the whole database —
+ * transactions, accounts, projects, tags, people, splits and settings — because
+ * the device is the only copy. Manual, local, no cloud.
  */
 
 import { db } from "../db/db.ts";
-import type {
-  Account,
-  CategoryRule,
-  Person,
-  Project,
-  Setting,
-  Split,
-  Tag,
-  Transaction,
-} from "../db/types.ts";
+import type { Account, Person, Project, Setting, Split, Tag, Transaction } from "../db/types.ts";
 
 export const BACKUP_SCHEMA = "taraz.backup.v1";
 
@@ -27,24 +18,21 @@ export interface Backup {
   tags: Tag[];
   people: Person[];
   splits: Split[];
-  categoryRules: CategoryRule[];
   settings: Setting[];
 }
 
 export type RestoreMode = "replace" | "merge";
 
 export async function exportBackup(): Promise<Backup> {
-  const [transactions, accounts, projects, tags, people, splits, categoryRules, settings] =
-    await Promise.all([
-      db.transactions.toArray(),
-      db.accounts.toArray(),
-      db.projects.toArray(),
-      db.tags.toArray(),
-      db.people.toArray(),
-      db.splits.toArray(),
-      db.categoryRules.toArray(),
-      db.settings.toArray(),
-    ]);
+  const [transactions, accounts, projects, tags, people, splits, settings] = await Promise.all([
+    db.transactions.toArray(),
+    db.accounts.toArray(),
+    db.projects.toArray(),
+    db.tags.toArray(),
+    db.people.toArray(),
+    db.splits.toArray(),
+    db.settings.toArray(),
+  ]);
   return {
     schema: BACKUP_SCHEMA,
     exportedAt: Date.now(),
@@ -54,7 +42,6 @@ export async function exportBackup(): Promise<Backup> {
     tags,
     people,
     splits,
-    categoryRules,
     settings,
   };
 }
@@ -79,8 +66,8 @@ export function parseBackup(text: string): Backup {
   for (const key of TABLES) {
     if (!Array.isArray(backup[key])) throw new Error(`بخش «${key}» در فایل نیست`);
   }
-  // A backup written before parse rules were dropped carries a table that no
-  // longer exists; restoring must ignore it, not fail on it.
+  // A backup written before rules were dropped carries tables that no longer
+  // exist; restoring must ignore them, not fail on them.
   return backup as Backup;
 }
 
@@ -91,7 +78,6 @@ const TABLES = [
   "tags",
   "people",
   "splits",
-  "categoryRules",
   "settings",
 ] as const;
 

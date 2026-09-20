@@ -1,6 +1,5 @@
 import { db } from "../db/db.ts";
 import { createTransaction } from "../db/repo.ts";
-import { autoCategorize } from "./categorize.ts";
 import { parseSms, type RawSms } from "./sms.ts";
 
 const DEDUPE_WINDOW_MS = 60_000;
@@ -63,11 +62,6 @@ export async function ingestOne(sms: RawSms, options: IngestOptions = {}): Promi
     status: "pending",
     parseConfidence: parsed?.confidence ?? 0,
   });
-
-  // Rules run at capture time (PRD 4.4): a correctly auto-categorized
-  // transaction should already be filed by the time the user opens the app.
-  const created = await db.transactions.get(transactionId);
-  if (created) await autoCategorize(created);
 
   return { result: parsed ? "created" : "unparsed", transactionId };
 }

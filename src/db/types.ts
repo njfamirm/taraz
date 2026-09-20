@@ -19,8 +19,6 @@ export interface Transaction {
   note: string | null;
   splitId: string | null;
   parseConfidence: number;
-  /** The category rule that filed it, when one did (4.4). */
-  matchedRuleId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -75,34 +73,6 @@ export interface Split {
   transactionId: string;
   mode: SplitMode;
   shares: Share[];
-}
-
-export interface Condition {
-  kind: "textContains" | "amountBetween" | "timeOfDay" | "dayOfWeek" | "account" | "direction";
-  keywords?: string[];
-  min?: number;
-  max?: number;
-  from?: string;
-  to?: string;
-  days?: number[];
-  accountId?: string;
-  direction?: Direction;
-}
-
-export interface CategoryRule {
-  id: string;
-  title: string;
-  enabled: boolean;
-  priority: number;
-  conditions: Condition[];
-  actions: {
-    projectId?: string;
-    tagIds?: string[];
-    /** A split needs a counterparty, so `splitMode` only applies with `personId`. */
-    splitMode?: SplitMode;
-    personId?: string;
-    note?: string;
-  };
 }
 
 export interface Setting {

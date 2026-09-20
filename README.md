@@ -21,22 +21,17 @@ Everything stays on the device. No server, no account, no network dependency.
 | 2 — Categorization (projects, tags, splits, claims)          | ✅ Done                                                         |
 | 3 — Parsing (normalization pipeline, bank profiles)          | ✅ Done — parsing is code, by design; see PRD §4.2              |
 | 4 — Native (Capacitor, SMS plugin, capture notifications)    | ✅ Inbox import, background receiver, and capture notifications |
-| 5 — Output (category rules, summary, AI export, backup)      | ✅ Done                                                         |
+| 5 — Output (summary, AI export, backup)                      | ✅ Done                                                         |
 
 See [`docs/PRD.md`](docs/PRD.md) for the full product requirements and the reasoning behind each
 decision.
 
-## Rules, export, backup
+## Categorizing, export, backup
 
-**Category rules** (Settings) are pure data: conditions about the _shape_ of a transaction —
-amount, time of day, day of week, account, direction — ANDed together, first match by priority
-wins. They run at capture time, so a correctly filed transaction needs no action at all, and the
-transaction records which rule fired. The one text condition reads only the note and counterparty
-the user wrote, never the bank's wording; guessing purpose from an SMS is not something this app
-does. A rule previews its match count against real history before it is saved, and
-"اجرا روی دسته‌بندی‌نشده‌ها" applies the set to the pending queue without touching anything already
-filed by hand. The capture notification itself does not yet say that a rule fired: it is posted
-natively by the broadcast receiver, before the WebView — and therefore the rule set — is awake.
+**Categorizing is manual.** There is no rule engine: an SMS lands in the inbox as `pending`
+and the user files it — project, tags, note, split — by hand. Guessing what a payment was for,
+whether from the bank's wording or from a rule the user wrote months ago, is not something this
+app does.
 
 **AI export** (Summary) copies one self-describing block — Markdown or compact JSON — for a Jalali
 month or a custom range. It declares its unit, its calendar, and what "real expense" means, and
@@ -44,7 +39,8 @@ carries totals, breakdowns by project and tag, a daily series, open claims, the 
 transactions and the counts of pending/unparsed rows. Raw SMS text, card tails and account ids are
 never in it.
 
-**Backup** (Settings) writes the whole database — rules and settings included — as one JSON file,
+**Backup** (Settings) writes the whole database — transactions, accounts, projects, tags, people,
+splits and settings — as one JSON file,
 restored by replacing everything or merging by `id`. Manual, local, no cloud, with a nudge once a
 backup is a month old.
 
@@ -91,7 +87,7 @@ numbers may be read at all is a permission question**, handled by the approved-s
 is entirely separate from parsing.
 
 **Categorizing from the notification shade is not possible, by design.** The ledger — accounts,
-projects, tags, rules — lives in IndexedDB inside the WebView. A notification action handled
+projects, tags — lives in IndexedDB inside the WebView. A notification action handled
 natively can neither read nor write it, and routing the tap to JavaScript starts the app anyway.
 The notification detects and hands off; registration happens in the app. See PRD §4.3.
 
@@ -115,7 +111,7 @@ pnpm dev
 ```
 
 Everything except SMS capture is fully verifiable in a browser: manual entry feeds the same
-ledger, and the rules, export and backup screens work with no Android build. Reading real messages
+ledger, and the export and backup screens work with no Android build. Reading real messages
 needs the APK, since the parser is fed by the native plugin.
 
 ```bash
@@ -150,9 +146,9 @@ These constraints are non-negotiable and are enforced in code, not policy:
 ```
 src/db/        Dexie schema, types, repositories — the contract everything else is a view over
 src/lib/       money (integer Rial), Jalali dates, SMS parsing and ingestion, the split engine,
-               category rules, the AI report, backup
+               the AI report, backup
 src/native/    Capacitor plugin bridges
-src/screens/   Inbox, Transactions, Claims, Summary, Export, Settings, category rules,
+src/screens/   Inbox, Transactions, Claims, Summary, Export, Settings,
                SMS import, manual entry, transaction detail
 android/       Capacitor Android shell and the native SmsReader plugin
 site/          The GitHub Pages download page

@@ -1,14 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import type {
-  Account,
-  CategoryRule,
-  Person,
-  Project,
-  Setting,
-  Split,
-  Tag,
-  Transaction,
-} from "./types.ts";
+import type { Account, Person, Project, Setting, Split, Tag, Transaction } from "./types.ts";
 
 export class TarazDB extends Dexie {
   transactions!: EntityTable<Transaction, "id">;
@@ -17,7 +8,6 @@ export class TarazDB extends Dexie {
   tags!: EntityTable<Tag, "id">;
   people!: EntityTable<Person, "id">;
   splits!: EntityTable<Split, "id">;
-  categoryRules!: EntityTable<CategoryRule, "id">;
   settings!: EntityTable<Setting, "key">;
 
   constructor() {
@@ -30,12 +20,14 @@ export class TarazDB extends Dexie {
       tags: "id, title, archived",
       people: "id, kind",
       splits: "id, transactionId",
-      categoryRules: "id, priority, enabled",
       settings: "key",
     });
     // Parsing is code, not user-editable rules (PRD 4.2), so the table it would
     // have lived in is gone. Dexie needs the drop declared to remove it.
     this.version(2).stores({ parseRules: null });
+    // Category rules are gone too (see 4.4): SMS gets filed by hand, so there is
+    // no rule set to keep, and the table goes with it.
+    this.version(3).stores({ categoryRules: null });
   }
 }
 
