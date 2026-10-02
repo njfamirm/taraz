@@ -87,3 +87,39 @@ export async function fetchManifest(channel: UpdateChannel): Promise<UpdateManif
   }
   return manifest;
 }
+
+/**
+ * Starts the download and hands the APK to Android's installer. Resolves
+ * `needs-permission` after opening settings when the one-off "install unknown
+ * apps" grant is missing; the caller asks the user to retry.
+ */
+export async function installUpdate(
+  manifest: UpdateManifest,
+): Promise<"started" | "needs-permission"> {
+  const { granted } = await AppUpdater.canInstall();
+  if (!granted) {
+    await AppUpdater.openInstallSettings();
+    return "needs-permission";
+  }
+  await AppUpdater.downloadAndInstall({ url: manifest.apkUrl });
+  return "started";
+}
+
+const DISMISSED_KEY = "taraz.updateDismissed";
+
+/** The newest versionCode the user chose "later" for, so a launch does not nag again. */
+export function readDismissed(): number {
+  try {
+    return Number(localStorage.getItem(DISMISSED_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function writeDismissed(versionCode: number): void {
+  try {
+    localStorage.setItem(DISMISSED_KEY, String(versionCode));
+  } catch {
+    // Worst case the prompt shows again next launch.
+  }
+}

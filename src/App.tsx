@@ -6,6 +6,7 @@ import { Inbox } from "./screens/Inbox.tsx";
 import { Transactions } from "./screens/Transactions.tsx";
 import { Claims } from "./screens/Claims.tsx";
 import { Summary } from "./screens/Summary.tsx";
+import { UpdateDialog } from "./components/UpdateDialog.tsx";
 import { Settings } from "./screens/Settings.tsx";
 import { ManualEntry } from "./screens/ManualEntry.tsx";
 import { TransactionDetail } from "./screens/TransactionDetail.tsx";
@@ -71,6 +72,7 @@ export default function App() {
 
   return (
     <AppShell active={tab} onChange={changeTab} pendingCount={pending.length}>
+      <UpdateDialog />
       {entryOpen ? (
         <ManualEntry onDone={() => setEntryOpen(false)} />
       ) : (

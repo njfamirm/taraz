@@ -3,6 +3,7 @@ import { Download, RefreshCw } from "lucide-react";
 import {
   AppUpdater,
   fetchManifest,
+  installUpdate,
   readChannel,
   updaterAvailable,
   writeChannel,
@@ -74,17 +75,13 @@ export function UpdateCard() {
   async function install(manifest: UpdateManifest) {
     setState({ kind: "downloading", progress: 0 });
     try {
-      // Android needs a one-off "install unknown apps" grant per app.
-      const { granted } = await AppUpdater.canInstall();
-      if (!granted) {
-        await AppUpdater.openInstallSettings();
+      if ((await installUpdate(manifest)) === "needs-permission") {
         setState({
           kind: "error",
           message: "اجازه‌ی نصب را روشن کنید و دوباره «نصب» را بزنید.",
         });
         return;
       }
-      await AppUpdater.downloadAndInstall({ url: manifest.apkUrl });
       setState({ kind: "installing" });
     } catch (error) {
       setState({ kind: "error", message: describe(error) });
