@@ -11,6 +11,7 @@ import {
 } from "../lib/backup.ts";
 import { copyText, downloadText } from "../lib/clipboard.ts";
 import { formatRelativeDay } from "../lib/date.ts";
+import { nativeFiles, saveFileNative } from "../native/files.ts";
 import { toPersianDigits } from "../lib/money.ts";
 
 const LAST_BACKUP_KEY = "lastBackupAt";
@@ -33,11 +34,18 @@ export function BackupCard() {
     const backup = await exportBackup();
     const text = JSON.stringify(backup);
     const name = backupFilename(backup.exportedAt);
-    // Some Android WebViews swallow a download; the clipboard is the fallback so
-    // the data is never trapped on the device.
-    if (downloadText(name, text)) {
-      setStatus(`${name} ذخیره شد — در پوشه‌ی «Downloads» (دانلودها) گوشی`);
-    } else setStatus((await copyText(text)) ? "دانلود ممکن نبود؛ متن پشتیبان کپی شد" : "ذخیره نشد");
+    if (nativeFiles) {
+      try {
+        const where = await saveFileNative(name, text);
+        setStatus(`ذخیره شد: ${where}`);
+      } catch {
+        setStatus((await copyText(text)) ? "ذخیره ممکن نبود؛ متن پشتیبان کپی شد" : "ذخیره نشد");
+      }
+    } else if (downloadText(name, text)) {
+      setStatus(`${name} دانلود شد`);
+    } else {
+      setStatus((await copyText(text)) ? "دانلود ممکن نبود؛ متن پشتیبان کپی شد" : "ذخیره نشد");
+    }
     await setSetting(LAST_BACKUP_KEY, backup.exportedAt);
   }
 
@@ -61,9 +69,9 @@ export function BackupCard() {
           : `آخرین پشتیبان: ${formatRelativeDay(lastBackupAt)}${stale ? " — وقتش رسیده" : ""}`}
       </p>
       <p className="text-xs text-[var(--color-ink-soft)]">
-        پشتیبان یک فایل JSON است که در پوشه‌ی «Downloads» گوشی ذخیره می‌شود (اگر دانلود نشد، متن آن
-        کپی می‌شود). تراز آن را جای دیگری نمی‌فرستد؛ فایل را خودتان به جای امن ببرید، مثلاً کامپیوتر یا
-        فضای ابری.
+        پشتیبان یک فایل JSON است. روی گوشی در «Documents/Taraz» ذخیره می‌شود و برگه‌ی اشتراک‌گذاری باز
+        می‌شود تا مستقیم به Drive، تلگرام یا کامپیوتر بفرستیدش. تراز خودش جایی نمی‌فرستد؛ فایل را حتماً
+        از گوشی بیرون ببرید.
       </p>
 
       <div className="flex gap-2">
