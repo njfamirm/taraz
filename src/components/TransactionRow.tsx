@@ -1,14 +1,18 @@
 import type { Transaction } from "../db/types.ts";
+import type { Labeler } from "../lib/labels.ts";
 import { formatToman } from "../lib/money.ts";
 import { formatJalaliTime, formatRelativeDay } from "../lib/date.ts";
 
 export function TransactionRow({
   tx,
   onClick,
+  labels,
 }: {
   tx: Transaction;
   onClick?: (tx: Transaction) => void;
+  labels?: Labeler;
 }) {
+  const chips = labels?.(tx) ?? [];
   const isIn = tx.direction === "in";
   // Captured but unreadable: kept so the raw text is not lost (PRD 4.1).
   const unreadable = tx.parseConfidence === 0 && tx.source === "sms";
@@ -26,6 +30,20 @@ export function TransactionRow({
           {formatRelativeDay(tx.occurredAt)} · {formatJalaliTime(tx.occurredAt)}
           {tx.status === "pending" && " · در انتظار"}
         </div>
+        {chips.length > 0 && (
+          <ul className="mt-1 flex flex-wrap gap-1">
+            {chips.map((chip) => (
+              <li
+                key={chip.key}
+                style={{ borderColor: chip.color }}
+                className="rounded-full border px-2 text-[11px]"
+              >
+                <span className="text-[var(--color-ink-soft)]">{chip.kind}: </span>
+                {chip.title}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       {unreadable ? (
         <div className="shrink-0 text-xs font-bold text-[var(--color-attention)]">

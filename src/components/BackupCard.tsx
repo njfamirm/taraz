@@ -35,8 +35,9 @@ export function BackupCard() {
     const name = backupFilename(backup.exportedAt);
     // Some Android WebViews swallow a download; the clipboard is the fallback so
     // the data is never trapped on the device.
-    if (downloadText(name, text)) setStatus(`${name} ذخیره شد`);
-    else setStatus((await copyText(text)) ? "دانلود ممکن نبود؛ متن پشتیبان کپی شد" : "ذخیره نشد");
+    if (downloadText(name, text)) {
+      setStatus(`${name} ذخیره شد — در پوشه‌ی «Downloads» (دانلودها) گوشی`);
+    } else setStatus((await copyText(text)) ? "دانلود ممکن نبود؛ متن پشتیبان کپی شد" : "ذخیره نشد");
     await setSetting(LAST_BACKUP_KEY, backup.exportedAt);
   }
 
@@ -58,6 +59,11 @@ export function BackupCard() {
         {lastBackupAt === undefined
           ? "هنوز پشتیبان نگرفته‌اید. تنها نسخه‌ی داده‌ها روی همین گوشی است."
           : `آخرین پشتیبان: ${formatRelativeDay(lastBackupAt)}${stale ? " — وقتش رسیده" : ""}`}
+      </p>
+      <p className="text-xs text-[var(--color-ink-soft)]">
+        پشتیبان یک فایل JSON است که در پوشه‌ی «Downloads» گوشی ذخیره می‌شود (اگر دانلود نشد، متن آن
+        کپی می‌شود). تراز آن را جای دیگری نمی‌فرستد؛ فایل را خودتان به جای امن ببرید، مثلاً کامپیوتر یا
+        فضای ابری.
       </p>
 
       <div className="flex gap-2">
